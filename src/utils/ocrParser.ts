@@ -211,79 +211,106 @@ function extractPlatform(text: string): string | undefined {
 
 function cleanName(raw: string): string {
   let n = raw
-    .replace(/^[•\-\*★☆■□\s\.\,。]+/, "")
+    .replace(/^[•\-\*★☆■□\s\.\,。\(\)\[\]<>«»]+/, "")
     // 常见的金额/OCR 前缀清洗
     // 正常写法: 减至/立减/立省/优惠至/超值至 / OCR误读: 央至
     .replace(/^(减至|央至|立减|立省|优惠至|超值至|特惠|限时|新人专享|新客专享)?\s*\d+(?:\.\d+)?\s*元?\s*/, "")
-    .replace(/[•\-\*★☆■□\s\.\,。]+$/, "")
+    .replace(/[•\-\*★☆■□\s\.\,。\(\)\[\]<>«»]+$/, "")
     .replace(/\s+/g, " ")
     .trim();
   // 去掉尾部 "去使用"、"立即领取" 等按钮文案
   n = n.replace(/\s*(去使用|立即领取|立即使用|领取|使用|查看|规则)$/, "");
-  // 去掉开头的引号噪声
+  // 去掉行尾的英文碎片（OCR 把图标识别成 2-5 个大写字母）
+  n = n.replace(/\s+[a-zA-Z]{1,5}$/, "").trim();
+  // 去掉开头的引号/符号噪声
   n = n.replace(/^[\"''"`'"]+/, "").trim();
   if (n.length > 30) n = n.slice(0, 30);
   return n;
 }
 
+// 判断一个候选字符串是否像"合理的券名称"（质量门槛）
+function isGoodName(candidate: string): boolean {
+  if (!candidate) return false;
+  if (candidate.length < 2) return false;
+  if (candidate.length > 30) return false;
+  const nosp = candidate.replace(/\s+/g, "");
+  // 纯英文/数字 → 不是券名（OCR 碎片）
+  if (/^[a-zA-Z0-9]+$/.test(nosp)) return false;
+  // 英文字母占比超过 40% → 大概率是碎片
+  const letters = (candidate.match(/[a-zA-Z]/g) || []).length;
+  if (candidate.length > 0 && letters / candidate.length > 0.4) return false;
+  // UI 黑名单关键字
+  const uiBlacklist = /(卡券|详情|返回|首页|我的|列表|中心|卡包|订单|消息|购物车|加载|暂无|登录|注册|账户|个人|会员|票夹|钱包|电子券|关闭|上一页|下一页|导航|切换|订阅|设置|提醒)/i;
+  if (uiBlacklist.test(nosp)) return false;
+  // 必须至少有 1 个中文字符（券名总得是中文）
+  if (!/[\u4e00-\u9fa5]/.test(candidate)) return false;
+  return true;
+}
+
 /**
  * 识别券/红包名称。策略顺序:
- * 1. "X元 YYYY 去使用" 风格（这张截图的主风格）
- * 2. 包含"券/红包/补贴"的行
- * 3. 含金额 + 汉字名行（例如"38元 惊喜市集红包"）
- * 4. 兜底: 平台+"红包/券"
+ * 1. "X元 YYYY 去使用" 风格（主流）
+ * 2. "减至X元 YYYY" 风格
+ * 3. 包含"券/红包/补贴"字且含金额信号的行
+ * 4. 平台名 + 金额 生成兜底名称（比乱取UI文字更安全）
+ *
+ * 重要：每一步都通过 isGoodName 做质量校验，杜绝把 UI 导航文字当名称
  */
 function extractName(text: string, platformHint?: string): string | undefined {
   if (!text) return undefined;
 
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  // 关键：OCR 经常在汉字之间加空格（如 "历史 优惠券 交换 优惠券 更多"）
-  // 所以做黑名单判断时要先去空格
-  const blacklist = /(商家券|膨胀券|历史优惠券|兑换优惠券|交换优惠券|全部优惠券|我的券|即将过期|最近领取|购买|去使用|立即领取|立即使用|规则|适用|门店|场景|渠道|商品|明细|满\d元|过期|到期|有效期|全场|可用|推荐好券|券后更划算|更多|返回|首页)/i;
-  const linePassBlacklist = (line: string) => blacklist.test(line.replace(/\s+/g, ""));
 
-  // 1. "X元 YYYYY..." 或 "减至X元 YYYYY..." 开头的行（主流格式）
+  // 1. "X元 YYYYY..." 或 "减至X元 YYYYY..." 开头的行（最常见格式）
   for (const line of lines) {
     const m1 = line.match(/^\d+(?:\.\d+)?\s*元\s+(.+)/);
     const m2 = line.match(/^减至\s*\d+(?:\.\d+)?\s*元?\s*(.+)/);
     const m = m1 || m2;
     if (m) {
       const candidate = cleanName(m[1]);
-      if (candidate && !linePassBlacklist(candidate) && candidate.length >= 2) {
-        return candidate;
-      }
+      if (isGoodName(candidate)) return candidate;
     }
     // 反向: YYYYY X元
     const m3 = line.match(/^(.+?)\s+\d+(?:\.\d+)?\s*元$/);
     if (m3) {
       const candidate = cleanName(m3[1]);
-      if (candidate && !linePassBlacklist(candidate) && candidate.length >= 2 && candidate.length <= 20) {
-        return candidate;
-      }
+      if (isGoodName(candidate)) return candidate;
     }
   }
 
-  // 2. 含"券/红包/补贴"字
+  // 2. 含"券/红包/补贴"字 + 至少有一个正面信号（金额或非UI词）
   for (const line of lines) {
-    if (/(券|红包|补贴|购物红)/.test(line) && !linePassBlacklist(line)) {
-      // 去掉可能尾随的 "去使用 / 规则"
+    const nosp = line.replace(/\s+/g, "");
+    const hasKeyword = /(券|红包|补贴)/.test(nosp);
+    const hasAmount = /\d/.test(line);
+    const hasGoodSignal = hasAmount || /(通用|专用|限时|新人|专享|饮品|外卖|超市|购物|惊喜|市集|咖啡|霸王|飞猪|天猫|淘宝|京东|拼多|美团|饿了|美团外卖)/.test(nosp);
+    if (hasKeyword && hasGoodSignal) {
       const cleaned = cleanName(line.replace(/\s+去使用.*$/, "").replace(/规则[>》]?\s*$/, ""));
-      if (cleaned && cleaned.length >= 2) return cleaned;
+      if (isGoodName(cleaned)) return cleaned;
     }
   }
 
   // 3. 含金额字且非纯时间金额行
   for (const line of lines) {
-    if (/(元|¥|￥|折)/.test(line) && !linePassBlacklist(line)) {
+    if (/(元|¥|￥|折)/.test(line)) {
       const cleaned = cleanName(line.replace(/^(减至|立减|立省|可抵用|央至)?[\d¥￥元\s\.％折]+/, ""));
-      if (cleaned && cleaned.length >= 2) return cleaned;
+      if (isGoodName(cleaned)) return cleaned;
     }
   }
 
-  // 4. 兜底
-  if (platformHint) return `${platformHint}红包`;
-  const top = lines.slice(0, 3).sort((a, b) => b.length - a.length)[0];
-  return top ? cleanName(top) : undefined;
+  // 4. 兜底：根据平台生成合理名称（比乱取UI文字更安全）
+  if (platformHint) {
+    // 尝试从全文找金额，拼成 "平台 + 金额券" 格式
+    const amountMatch = text.match(/(\d+(?:\.\d+)?)\s*元/);
+    if (amountMatch) return `${platformHint}${amountMatch[1]}元券`;
+    return `${platformHint}红包`;
+  }
+  // 最终兜底：从 lines 中找最长、包含中文且不是UI文字的一行
+  const goodCandidates = lines
+    .map(cleanName)
+    .filter(isGoodName)
+    .sort((a, b) => b.length - a.length);
+  return goodCandidates[0] || undefined;
 }
 
 // ============ 备注 ============
@@ -366,16 +393,26 @@ export interface CouponCandidate {
 // 特征：2-5 个全大写字母；或 1-2 个随机小写字母
 function stripOcrNoise(line: string): string {
   if (!line) return line;
-  return line
+  let out = line
+    // 导航符号（APP 顶部返回/箭头/括号被 OCR 识别残留）
+    .replace(/[<>\[\]()（）«»‹›→←↑↓↵]/g, " ")
     // 常见具体噪声（从截图反复出现的）
-    .replace(/\b(ARAHEFv|EHR|Vv|co|c[oö]|AD|a|«[»]?|»|<|>)\b/gi, " ")
+    .replace(/\b(ARAHEFv|EHR|Vv|co|c[oö]|AD|LINO|LUCK|LINE|LOGO|LLNO|LNO|a)\b/gi, " ")
     // 孤立的 1-2 个字符（中英文混合的碎片）
     .replace(/\s[a-zA-Z]\s/g, " ")
     .replace(/\s[a-zA-Z]{2}\s/g, " ")
+    // 行首/行尾的 1-3 个英文字母碎片（如"详情 LINO"中的 LINO）
+    .replace(/^[a-zA-Z]{1,4}\s+/, " ")
+    .replace(/\s+[a-zA-Z]{1,4}$/, " ")
+    // 英文碎片夹在中文之间（如 "卡 券 详情 LINO" → 去掉 LINO 类）
+    .replace(/[\u4e00-\u9fa5]\s+([a-zA-Z]{2,5})\s*$/g, (m) => m.replace(/\s+[a-zA-Z]{2,5}\s*$/, ""))
     // 引号等残余符号
     .replace(/[""''`"""]/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
+  // 二次清洗：行首行尾孤立英文字母碎片
+  out = out.replace(/^[a-zA-Z]{1,3}\s*/, "").replace(/\s*[a-zA-Z]{1,3}$/, "").trim();
+  return out;
 }
 
 /**
@@ -400,11 +437,22 @@ function lineLooksLikeTitle(line: string): boolean {
     "券有效期", "限制支付", "明细", "规则", "更多", "返回", "首页", "我的",
     "新客专享专享", "设置", "开启", "订阅", "切换", "列表",
     "会员卡", "票", "证件", "全部\\(\\d+\\)",
+    // ↓↓ 本次新增：APP 顶部导航/页面框架文案
+    "卡券详情", "卡.*券", "券详情", "券中心", "卡包", "会员卡包",
+    "页面详情", "详情页", "详情$", "返回首页", "返回列表", "我的卡包",
+    "优惠券主页", "优惠券中心", "我的账户", "个人中心", "会员中心",
+    "账户中心", "消息中心", "消息列表", "订单", "订单列表", "购物车",
+    "会员卡详情", "电子券", "票券", "票夹", "钱包", "优惠券包",
+    "登录", "注册", "忘记密码", "加载中", "正在加载", "暂无数据",
   ];
   const blacklist = new RegExp(blacklistKeywords.join("|"), "i");
   // 关键：OCR 经常在汉字之间加空格（如 "历史 优惠券 交换 优惠券 更多"）
   // 所以用去空格后的字符串做黑名单判断
   if (blacklist.test(cleaned.replace(/\s+/g, ""))) return false;
+
+  // 额外过滤：整行看起来像 UI 导航（只有"返回/首页/详情/我的/卡券"等短词）
+  const uINavPattern = /^(返回|首页|我的|返回首页|返回列表|返回上一页|上一页|下一页|关闭|返回键|返回首页)$/i;
+  if (uINavPattern.test(cleaned.replace(/\s+/g, ""))) return false;
 
   // 含"满X元可用"这种满减门槛行，不是标题
   if (/^满\d+(?:\.\d+)?元?可?用/.test(cleaned)) return false;
@@ -570,13 +618,10 @@ export function parseMultipleCoupons(rawText: string): CouponCandidate[] {
 
     const parsed = parseCouponText(cleanedBlock || rawBlock);
 
-    // 质量门槛：至少要有金额 或 过期日期；或者有名称且名称不空洞
+    // 质量门槛：至少要有金额 或 过期日期；或者有名称且名称通过质量校验
     const hasAmount = !!parsed.amount;
     const hasDate = !!parsed.expiryDate;
-    const hasGoodName =
-      !!parsed.name &&
-      parsed.name.length >= 3 &&
-      !/^(优惠券|券列表|全部券|历史券|我的券|领取|使用|更多)$/.test(parsed.name);
+    const hasGoodName = !!parsed.name && isGoodName(parsed.name);
 
     if (!(hasAmount || hasDate || hasGoodName)) continue;
 
