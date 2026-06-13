@@ -7,6 +7,7 @@ import CouponModal from "./components/CouponModal";
 import { useCouponStore } from "./store/couponStore";
 import type { Coupon, CouponInput } from "./types/coupon";
 import { daysUntil } from "./utils/date";
+import { preloadOCR } from "./utils/ocrService";
 
 export default function App() {
   const {
@@ -32,6 +33,17 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refreshExpired]);
+
+  // 页面加载时预加载 OCR 引擎，提前下载语言包
+  useEffect(() => {
+    // 使用 setTimeout 延迟执行，让页面先渲染出来
+    const timer = setTimeout(() => {
+      preloadOCR((progress, status) => {
+        console.log(`OCR 预加载: ${(progress * 100).toFixed(0)}% - ${status}`);
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);

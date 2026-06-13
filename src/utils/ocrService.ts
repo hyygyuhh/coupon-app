@@ -19,17 +19,33 @@ const INTERESTING_STATUS = new Set<string>([
   "recognizing text",
 ]);
 
+// 进度状态中文映射 —— 让用户更容易理解
+const STATUS_MAP: Record<string, string> = {
+  "loading tesseract core": "正在加载核心引擎...",
+  "initializing tesseract": "正在初始化引擎...",
+  "loading language traineddata": "正在下载语言包...",
+  "initializing api": "正在准备识别环境...",
+  "recognizing text": "正在识别图片...",
+};
+
 async function getWorker(): Promise<Worker> {
   if (workerPromise) return workerPromise;
 
   workerPromise = (async () => {
+    // 使用 jsDelivr 镜像加速语言包下载
+    // 通过在 createWorker 前设置全局变量来指定语言包路径
+    (window as any).Tesseract = (window as any).Tesseract || {};
+    (window as any).Tesseract.langPath = "https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata@main/";
+    
     const worker = await createWorker(["chi_sim", "eng"], 1, {
       logger: (m) => {
         if (INTERESTING_STATUS.has(m.status)) {
-          currentOnProgress?.(m.progress, m.status);
+          const statusText = STATUS_MAP[m.status] || m.status;
+          currentOnProgress?.(m.progress, statusText);
         }
       },
     });
+
     // 假定为一个统一的文本块 —— 对优惠券截图识别更准
     await worker.setParameters({
       tessedit_pageseg_mode: "6",
@@ -63,6 +79,20 @@ export async function recognizeImage(
     text: data.text || "",
     confidence: data.confidence || 0,
   };
+}
+
+/**
+ * 预加载 OCR 引擎（可在页面加载时调用，提前下载语言包）
+ */
+export async function preloadOCR(onProgress?: (progress: number, status: string) => void): Promise<void> {
+  currentOnProgress = onProgress ?? null;
+  try {
+    await getWorker();
+    currentOnProgress?.(1, "OCR 引擎已就绪");
+  } catch (error) {
+    console.warn("OCR 预加载失败:", error);
+    // 预加载失败不影响后续使用，首次识别时会重新尝试
+  }
 }
 
 /**
