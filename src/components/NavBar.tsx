@@ -22,6 +22,7 @@ export default function NavBar({ onAdd }: Props) {
           </div>
         </div>
         <button
+          type="button"
           onClick={onAdd}
           className="flex items-center gap-2 bg-accent-orange hover:bg-accent-orange/90 text-white px-4 py-2 rounded-full font-bold shadow-card hover:shadow-cardHover transition active:scale-95"
         >

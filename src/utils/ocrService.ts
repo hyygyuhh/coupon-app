@@ -6,25 +6,33 @@
 import { createWorker, Worker } from "tesseract.js";
 
 let workerPromise: Promise<Worker> | null = null;
+// 当前正在执行识别的回调（可随时更新，避免被首次调用时的闭包锁定）
+let currentOnProgress: ((p: number, status: string) => void) | null = null;
 
-async function getWorker(
-  onProgress?: (p: number, status: string) => void
-): Promise<Worker> {
+// 关注的进度状态 —— 其他 tesseract 内部状态（如 "loading tesseract core" 等）
+// 统一归到"准备中"，让 UI 更简洁
+const INTERESTING_STATUS = new Set<string>([
+  "loading tesseract core",
+  "initializing tesseract",
+  "loading language traineddata",
+  "initializing api",
+  "recognizing text",
+]);
+
+async function getWorker(): Promise<Worker> {
   if (workerPromise) return workerPromise;
 
   workerPromise = (async () => {
     const worker = await createWorker(["chi_sim", "eng"], 1, {
       logger: (m) => {
-        if (m.status === "recognizing text" || m.status === "loading tesseract core" ||
-            m.status === "initializing tesseract" || m.status === "loading language traineddata" ||
-            m.status === "initializing api") {
-          onProgress?.(m.progress, m.status);
+        if (INTERESTING_STATUS.has(m.status)) {
+          currentOnProgress?.(m.progress, m.status);
         }
       },
     });
-    // 仅保留单通道图像，识别更快
+    // 假定为一个统一的文本块 —— 对优惠券截图识别更准
     await worker.setParameters({
-      tessedit_pageseg_mode: "6", // 假定为一个统一的文本块
+      tessedit_pageseg_mode: "6",
     } as any);
     return worker;
   })();
@@ -44,10 +52,13 @@ export async function recognizeImage(
   file: File,
   onProgress?: (progress: number, status: string) => void
 ): Promise<OCRResult> {
-  const worker = await getWorker(onProgress);
+  // 关键：每次识别都挂自己的回调，避免复用首次调用的闭包
+  currentOnProgress = onProgress ?? null;
+
+  const worker = await getWorker();
   const { data } = await worker.recognize(file);
 
-  onProgress?.(1, "识别完成");
+  currentOnProgress?.(1, "识别完成");
   return {
     text: data.text || "",
     confidence: data.confidence || 0,
@@ -55,7 +66,7 @@ export async function recognizeImage(
 }
 
 /**
- * 重设 Worker（用于异常恢复 —— 不过 tesseract.js 一般稳定，这里仅保留作为备用 API）
+ * 重设 Worker（用于异常恢复 —— 一般不需要主动调用）
  */
 export async function resetWorker(): Promise<void> {
   if (workerPromise) {

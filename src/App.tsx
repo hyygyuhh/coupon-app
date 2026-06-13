@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import NavBar from "./components/NavBar";
 import HeroSection from "./components/HeroSection";
 import CouponList from "./components/CouponList";
@@ -16,10 +16,37 @@ export default function App() {
     markUsed,
     markUnused,
     removeCoupon,
+    refreshExpired,
   } = useCouponStore();
+
+  // 启动后 & 每隔 1 小时自动刷新过期状态；页面从后台回到前台时也立即检查一次
+  useEffect(() => {
+    refreshExpired();
+    const timer = window.setInterval(refreshExpired, 60 * 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshExpired();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshExpired]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Coupon | null>(null);
+
+  // 打开任一弹窗时锁定 body 滚动
+  useEffect(() => {
+    if (pendingDelete || modalOpen) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }
+  }, [pendingDelete, modalOpen]);
 
   const stats = useMemo(() => {
     const total = coupons.length;
@@ -54,7 +81,16 @@ export default function App() {
     else markUsed(c.id);
   };
   const onDelete = (c: Coupon) => {
-    if (confirm(`确定删除「${c.name}」？`)) removeCoupon(c.id);
+    setPendingDelete(c);
+  };
+  const confirmDelete = () => {
+    if (pendingDelete) {
+      removeCoupon(pendingDelete.id);
+      setPendingDelete(null);
+    }
+  };
+  const cancelDelete = () => {
+    setPendingDelete(null);
   };
 
   return (
@@ -85,6 +121,44 @@ export default function App() {
         onClose={() => setModalOpen(false)}
         onSave={onSave}
       />
+
+      {/* 删除确认 —— 替代原生 confirm()，更安全更美观 */}
+      {pendingDelete && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-accent-ink/40 backdrop-blur-sm animate-floatUp"
+          onClick={cancelDelete}
+        >
+          <div
+            className="relative bg-cream rounded-3xl shadow-cardHover w-full max-w-sm p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-4xl mb-3">🗑️</div>
+            <h3 className="font-display text-xl font-bold text-accent-ink mb-1">
+              确认删除这张券？
+            </h3>
+            <p className="text-sm text-accent-inkMute mb-5 break-all">
+              「{pendingDelete.name}」删除后无法恢复
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                className="px-5 py-2 rounded-full font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/60 transition"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="px-5 py-2 rounded-full font-bold text-white bg-accent-red hover:bg-accent-red/90 shadow-card transition active:scale-95"
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="text-center pb-8 text-xs text-accent-inkMute">
         🐑 羊毛管家 · 数据保存在你的浏览器本地
       </footer>

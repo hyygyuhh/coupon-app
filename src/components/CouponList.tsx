@@ -84,6 +84,7 @@ export default function CouponList({
           {tabs.map((t) => (
             <button
               key={t.key}
+              type="button"
               onClick={() => setFilter(t.key)}
               className={`px-4 py-1.5 rounded-full text-sm font-bold transition ${
                 filter === t.key ? tabBg[t.key] : tabInactive

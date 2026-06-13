@@ -13,6 +13,7 @@ export default function EmptyState({ onAdd }: Props) {
         把你抢到的优惠券都放在这里吧，管家会提醒你过期时间。
       </p>
       <button
+        type="button"
         onClick={onAdd}
         className="mt-5 px-5 py-2.5 rounded-full bg-accent-orange text-white font-bold shadow-card hover:shadow-cardHover hover:-translate-y-0.5 transition"
       >

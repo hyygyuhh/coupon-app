@@ -92,6 +92,7 @@ export default function CouponCard({
 
             {coupon.code && (
               <button
+                type="button"
                 onClick={copyCode}
                 className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/30 px-2.5 py-1 rounded-lg transition"
               >
@@ -134,6 +135,7 @@ export default function CouponCard({
               </a>
             )}
             <button
+              type="button"
               onClick={() => onToggleUsed(coupon)}
               className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition ${
                 used
@@ -144,12 +146,14 @@ export default function CouponCard({
               <Check size={14} /> {used ? "取消已用" : "标记已用"}
             </button>
             <button
+              type="button"
               onClick={() => onEdit(coupon)}
               className="inline-flex items-center gap-1 text-xs font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 px-2.5 py-1.5 rounded-lg transition"
             >
               <Edit3 size={14} /> 编辑
             </button>
             <button
+              type="button"
               onClick={() => onDelete(coupon)}
               className="inline-flex items-center gap-1 text-xs font-bold text-accent-red bg-accent-redLight/30 hover:bg-accent-redLight/60 px-2.5 py-1.5 rounded-lg transition ml-auto"
             >

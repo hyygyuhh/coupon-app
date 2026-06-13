@@ -182,6 +182,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
             {coupon ? "编辑券" : "添加新券"}
           </h3>
           <button
+            type="button"
             onClick={onClose}
             className="w-9 h-9 rounded-full hover:bg-paper flex items-center justify-center text-accent-ink transition"
           >
@@ -256,6 +257,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
                       {candidates.length > 1 ? "，点击卡片切换" : "，请核对下方字段"}
                     </div>
                     <button
+                      type="button"
                       onClick={() => setShowRaw((s) => !s)}
                       className="text-xs font-bold text-accent-orange hover:underline mt-1"
                     >
@@ -271,6 +273,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
                       return (
                         <button
                           key={i}
+                          type="button"
                           onClick={() => {
                             setActiveIdx(i);
                             // 切换候选券时：先重置表单，再用新券的数据填充
@@ -320,6 +323,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-accent-inkMute">原始文本</span>
                       <button
+                        type="button"
                         onClick={copyRaw}
                         className="text-accent-orange hover:underline flex items-center gap-1"
                       >
@@ -412,12 +416,14 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
 
         <div className="sticky bottom-0 bg-cream border-t border-accent-orangeLight/40 px-6 py-4 flex justify-end gap-3">
           <button
+            type="button"
             onClick={onClose}
             className="px-5 py-2 rounded-full font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 transition"
           >
             取消
           </button>
           <button
+            type="button"
             onClick={submit}
             className="px-5 py-2 rounded-full font-bold text-white bg-accent-orange hover:bg-accent-orange/90 shadow-card transition active:scale-95"
           >
