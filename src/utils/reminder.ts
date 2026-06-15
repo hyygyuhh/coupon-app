@@ -117,7 +117,7 @@ export async function sendTestReminder(
 ): Promise<boolean> {
   const reminderConfig = config || getReminderConfig();
   
-  if (!reminderConfig.enabled || !reminderConfig.webhook) {
+  if (!reminderConfig.webhook) {
     return false;
   }
 
