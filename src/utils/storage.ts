@@ -29,6 +29,25 @@ export function saveCoupons(coupons: Coupon[]): void {
   }
 }
 
+export function loadConfig<T>(key: string): Partial<T> {
+  try {
+    const raw = localStorage.getItem(`config-${key}`);
+    if (!raw) return {};
+    return JSON.parse(raw) as Partial<T>;
+  } catch (e) {
+    console.warn(`加载配置 ${key} 失败:`, e);
+    return {};
+  }
+}
+
+export function saveConfig<T>(key: string, config: T): void {
+  try {
+    localStorage.setItem(`config-${key}`, JSON.stringify(config));
+  } catch (e) {
+    console.warn(`保存配置 ${key} 失败:`, e);
+  }
+}
+
 export function uid(): string {
   return (
     Date.now().toString(36) + Math.random().toString(36).slice(2, 8)

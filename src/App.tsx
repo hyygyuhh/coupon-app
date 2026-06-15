@@ -4,10 +4,14 @@ import HeroSection from "./components/HeroSection";
 import CouponList from "./components/CouponList";
 import EmptyState from "./components/EmptyState";
 import CouponModal from "./components/CouponModal";
+import DingTalkSettings from "./components/DingTalkSettings";
 import { useCouponStore } from "./store/couponStore";
 import type { Coupon, CouponInput } from "./types/coupon";
 import { daysUntil } from "./utils/date";
 import { preloadOCR } from "./utils/ocrService";
+import { sendReminderIfNeeded } from "./utils/reminder";
+
+type View = "home" | "settings";
 
 export default function App() {
   const {
@@ -20,7 +24,8 @@ export default function App() {
     refreshExpired,
   } = useCouponStore();
 
-  // 启动后 & 每隔 1 小时自动刷新过期状态；页面从后台回到前台时也立即检查一次
+  const [view, setView] = useState<View>("home");
+
   useEffect(() => {
     refreshExpired();
     const timer = window.setInterval(refreshExpired, 60 * 60 * 1000);
@@ -34,9 +39,7 @@ export default function App() {
     };
   }, [refreshExpired]);
 
-  // 页面加载时预加载 OCR 引擎，提前下载语言包
   useEffect(() => {
-    // 使用 setTimeout 延迟执行，让页面先渲染出来
     const timer = setTimeout(() => {
       preloadOCR((progress, status) => {
         console.log(`OCR 预加载: ${(progress * 100).toFixed(0)}% - ${status}`);
@@ -45,11 +48,17 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      await sendReminderIfNeeded(coupons);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [coupons]);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Coupon | null>(null);
 
-  // 打开任一弹窗时锁定 body 滚动
   useEffect(() => {
     if (pendingDelete || modalOpen) {
       const original = document.body.style.overflow;
@@ -105,9 +114,21 @@ export default function App() {
     setPendingDelete(null);
   };
 
+  if (view === "settings") {
+    return (
+      <div className="min-h-screen text-accent-ink">
+        <NavBar onAdd={openAdd} onSettings={() => setView("home")} />
+        <DingTalkSettings />
+        <footer className="text-center pb-8 text-xs text-accent-inkMute">
+          🐑 羊毛管家 · 数据保存在你的浏览器本地
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen text-accent-ink">
-      <NavBar onAdd={openAdd} />
+      <NavBar onAdd={openAdd} onSettings={() => setView("settings")} />
       <HeroSection
         total={stats.total}
         soon={stats.soon}
@@ -134,7 +155,6 @@ export default function App() {
         onSave={onSave}
       />
 
-      {/* 删除确认 —— 替代原生 confirm()，更安全更美观 */}
       {pendingDelete && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-accent-ink/40 backdrop-blur-sm animate-floatUp"
