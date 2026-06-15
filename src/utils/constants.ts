@@ -10,6 +10,8 @@ export const MIN_REMINDER_DAYS = 1;
 
 export const OCR_PRELOAD_DELAY_MS = 1000;
 
+export const SYNC_DELAY_MS = 3000;
+
 export const STORAGE_KEYS = {
   COUPONS: "coupon-data",
   REMINDER_CONFIG: "reminder-config",

@@ -10,7 +10,8 @@ import type { Coupon, CouponInput } from "./types/coupon";
 import { daysUntil } from "./utils/date";
 import { preloadOCR } from "./utils/ocrService";
 import { sendReminderIfNeeded } from "./utils/reminder";
-import { REMINDER_DELAY_MS, EXPIRED_REFRESH_INTERVAL_MS, OCR_PRELOAD_DELAY_MS } from "./utils/constants";
+import { syncToCloud } from "./utils/cloudSync";
+import { REMINDER_DELAY_MS, EXPIRED_REFRESH_INTERVAL_MS, OCR_PRELOAD_DELAY_MS, SYNC_DELAY_MS } from "./utils/constants";
 
 type View = "home" | "settings";
 
@@ -53,6 +54,14 @@ export default function App() {
     const timer = setTimeout(async () => {
       await sendReminderIfNeeded(coupons);
     }, REMINDER_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [coupons]);
+
+  // 自动同步到云端
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      syncToCloud(coupons).catch(console.error);
+    }, SYNC_DELAY_MS);
     return () => clearTimeout(timer);
   }, [coupons]);
 
