@@ -57,12 +57,6 @@ export async function sendReminderIfNeeded(
   }
 
   const now = Date.now();
-  const lastTime = reminderConfig.lastReminderTime;
-  const oneDay = 24 * 60 * 60 * 1000;
-  
-  if (!reminderConfig.testMode && now - lastTime < oneDay) {
-    return false;
-  }
 
   const expiring = getExpiringCoupons(coupons, reminderConfig.reminderDays);
   
@@ -101,12 +95,7 @@ export async function sendReminderIfNeeded(
     );
   }
 
-  if (success) {
-    saveReminderConfig({
-      ...reminderConfig,
-      lastReminderTime: now,
-    });
-  }
+  
 
   return success;
 }
