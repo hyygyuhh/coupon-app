@@ -13,7 +13,8 @@
  */
 
 import { createWorker, Worker } from "tesseract.js";
-import { generateMultiResolution, processImage, type ProcessedImage } from "./imageProcessor";
+import { generateMultiResolution } from "./imageProcessor";
+import { generatePhotoVariants, detectPhotoMode } from "./photoEnhancer";
 
 export interface OCRResult {
   text: string;
@@ -214,9 +215,13 @@ export async function recognizeImage(
 ): Promise<OCRResult> {
   onProgress?.(0, "正在读取图片");
 
-  // 步骤 1：预处理，生成多种分辨率/灰度组合
-  onProgress?.(0.05, "正在优化图片");
-  const variants = await generateMultiResolution(file);
+  // 步骤 1：判断图片类型，拍照需要更强的预处理
+  onProgress?.(0.03, "正在分析图片类型");
+  const isPhoto = await detectPhotoMode(file);
+  onProgress?.(0.05, isPhoto ? "正在增强拍照图片" : "正在优化截图");
+  const variants = isPhoto
+    ? await generatePhotoVariants(file)  // 拍照增强模式
+    : await generateMultiResolution(file); // 截图模式
 
   try {
     // 步骤 2：确保 worker 就绪

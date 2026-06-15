@@ -550,7 +550,7 @@ export function splitCouponBlocks(rawText: string): string[] {
   // 步骤 2：如果没有标题锚点，找包含日期 + 平台关键词的行作为锚点
   if (anchors.length === 0) {
     for (let i = 0; i < lines.length; i++) {
-      const hasDate = /\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}|(\d{1,2})[月-\/](\d{1,2})/.test(lines[i]);
+      const hasDate = /\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}|(\d{1,2})[月/](\d{1,2})/.test(lines[i]);
       const hasPlatform = PLATFORM_KEYWORDS.some((kw) => kw.pattern.test(lines[i]));
       if (hasDate || hasPlatform) anchors.push(i);
     }
