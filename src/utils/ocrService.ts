@@ -85,11 +85,8 @@ async function recognizeWithMode(
   // 动态切换 PSM 模式
   await worker.setParameters({
     tessedit_pageseg_mode: psm,
-    // 字符白名单：只输出中文 + 英文 + 数字 + 常见符号
-    // 注意：chi_sim 包下此参数效果有限（中文识别依赖大字符集），
-    // 但对英文/数字/符号能有效限制，减少噪声
-    tessedit_char_whitelist:
-      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ¥￥.,:：;()（）-~年月日期限期新专享通用限时饮外卖超市购物满减可用至即止红包券补贴扣优惠咖啡飞猪",
+    // 注意：不对 chi_sim 引擎使用字符白名单，因为白名单会误杀中文字符
+    // 噪声清理交给后端 ocrParser.ts 的 stripOcrNoise 函数处理
   } as any);
 
   // 挂临时 logger，识别中给业务传进度
@@ -117,8 +114,13 @@ async function recognizeWithMode(
 
 /**
  * 从多轮识别结果中合并出"最完整"的文本
- * 策略：取置信度最高的一段作为基准；
- *      其他段中若含基准段没有的关键信息（日期/金额/券名），也附加进去
+ *
+ * 策略：
+ * 1. 给每个候选打分：综合置信度 × 中文丰富度
+ *    （中文越多说明噪声越少，越是有效的券信息）
+ * 2. 选评分最高的那一轮作为主结果
+ * 3. 补充阶段：从其他轮中提取"主结果里完全没有"的行（可能有遗漏的信息）
+ * 4. 整体做一次 stripOcrNoise 清洗
  */
 function mergeResults(
   rounds: { mode: string; text: string; confidence: number; width: number }[]
@@ -126,25 +128,76 @@ function mergeResults(
   if (rounds.length === 0) return "";
   if (rounds.length === 1) return rounds[0].text;
 
-  // 按（置信度 * 权重）排序，取综合评分最高的前 2 个，文本直接拼接（去重空行）
-  const sorted = [...rounds].sort((a, b) => b.confidence - a.confidence);
-  const merged: string[] = [];
-  const seen = new Set<string>();
+  // 计算"中文丰富度"：中文字符数 / 总字符数（越高说明越干净）
+  function chineseRatio(text: string): number {
+    const chars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+    const total = text.replace(/\s/g, "").length;
+    return total > 0 ? chars / total : 0;
+  }
 
-  for (const r of sorted.slice(0, 2)) {
+  // 综合评分 = 置信度 × (1 + 中文占比)（中文越多权重越高）
+  const scored = rounds.map((r) => {
+    const ratio = chineseRatio(r.text);
+    const score = r.confidence * (1 + ratio);
+    return { ...r, score, chineseRatio: ratio };
+  });
+
+  // 按综合评分排序
+  scored.sort((a, b) => b.score - a.score);
+
+  const primary = scored[0];
+
+  // 用 primary 的行作为主体
+  const primaryLines = new Set<string>();
+  const resultLines: string[] = [];
+
+  for (const line of primary.text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const key = trimmed.replace(/\s+/g, "");
+    primaryLines.add(key);
+    resultLines.push(trimmed);
+  }
+
+  // 补充阶段：从次优结果中找 primary 里没有的行
+  for (let i = 1; i < scored.length; i++) {
+    const r = scored[i];
+    // 只要这一轮的置信度不低于 primary 的 70%，才补充（避免低质量结果混入）
+    if (r.confidence < primary.confidence * 0.7) continue;
+
     for (const line of r.text.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      // 去重：同一行已存在的话就不加
+      // 只补充包含中文的行（英文碎片的行不需要）
+      if (!/[\u4e00-\u9fa5]/.test(trimmed)) continue;
       const key = trimmed.replace(/\s+/g, "");
-      if (!seen.has(key)) {
-        seen.add(key);
-        merged.push(trimmed);
+      if (!primaryLines.has(key)) {
+        primaryLines.add(key);
+        resultLines.push(trimmed);
       }
     }
   }
 
-  return merged.join("\n");
+  // 最终清理：用 stripOcrNoise 去掉残余噪声（英文碎片、符号等）
+  const cleaned = resultLines
+    .map(stripOcrNoise)
+    .filter((l) => l && l.length > 1)
+    .join("\n");
+
+  return cleaned || primary.text;
+}
+
+// 简化的噪声清洗（供 mergeResults 调用）
+function stripOcrNoise(line: string): string {
+  if (!line) return line;
+  return line
+    .replace(/[<>\[\]()（）«»‹›→←↑↓■□★☆*~]+/g, " ")
+    .replace(/\b(AUH|EHR|Vv|co|AD|LINO|LUCK|LINE|LOGO|LLNO|LNO|ARAH|AHE|AUV|AIA|AVA|HEY)\b/gi, " ")
+    .replace(/^[A-Za-z]{1,4}\s+/, " ")
+    .replace(/\s+[A-Za-z]{1,4}$/, " ")
+    .replace(/["''""`']/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /**
@@ -183,24 +236,14 @@ export async function recognizeImage(
       width: number;
     }[] = [];
 
-    const totalScans = 5;
+    const totalScans = scanPlan.length;
     let scanIdx = 0;
-
-    // 为每种扫描配置 (图片变体, PSM) 执行识别
-    const scanPlan: { variant: ProcessedImage; psm: PSM; label: string }[] = [
-      { variant: variants[0], psm: "11", label: "稀疏文本扫描(灰度)" },
-      { variant: variants[0], psm: "4", label: "按列扫描(灰度)" },
-      { variant: variants[0], psm: "6", label: "文本块扫描(灰度)" },
-      { variant: variants[1], psm: "11", label: "小文字增强扫描" },
-      { variant: variants[2], psm: "11", label: "彩色增强扫描" },
-    ];
 
     for (const { variant, psm, label } of scanPlan) {
       const baseProgress = 0.15 + (scanIdx / totalScans) * 0.8;
       onProgress?.(baseProgress, label);
       try {
         const result = await recognizeWithMode(worker, variant.blob, psm, (p) => {
-          // 当前扫描内部进度（0-1）映射到整体进度区间
           const overall = 0.15 + ((scanIdx + p) / totalScans) * 0.8;
           onProgress?.(overall, label);
         });
