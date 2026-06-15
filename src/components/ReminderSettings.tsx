@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   getReminderConfig,
   saveReminderConfig,
@@ -8,39 +8,76 @@ import {
 } from "../utils/reminder";
 
 export default function ReminderSettings() {
-  const [config, setConfig] = useState<ReminderConfig>(getReminderConfig());
+  const [config, setConfig] = useState<ReminderConfig>(() => getReminderConfig());
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
+  const [showSaved, setShowSaved] = useState(false);
 
-  useEffect(() => {
-    setConfig(getReminderConfig());
+  // 写回本地存储
+  const persist = useCallback((next: ReminderConfig) => {
+    saveReminderConfig(next);
+    setShowSaved(true);
+    setTimeout(() => setShowSaved(false), 1200);
   }, []);
 
-  const handleChange = (key: keyof ReminderConfig, value: string | number | boolean) => {
-    const newConfig = { ...config, [key]: value };
-    setConfig(newConfig);
-    saveReminderConfig(newConfig);
-  };
+  const handleEnabled = useCallback(
+    () => {
+      const next = { ...config, enabled: !config.enabled };
+      setConfig(next);
+      persist(next);
+    },
+    [config, persist]
+  );
+
+  const handleTypeChange = useCallback(
+    (type: ReminderType) => {
+      const next = { ...config, type };
+      setConfig(next);
+      persist(next);
+      setTestResult(null);
+    },
+    [config, persist]
+  );
+
+  const handleTextChange = useCallback(
+    (key: "webhook" | "secret", value: string) => {
+      const next = { ...config, [key]: value };
+      setConfig(next);
+      persist(next);
+    },
+    [config, persist]
+  );
+
+  const handleDaysChange = useCallback(
+    (daysStr: string) => {
+      const parsed = parseInt(daysStr, 10);
+      if (isNaN(parsed)) return;
+      const clamped = Math.max(1, Math.min(30, parsed));
+      const next = { ...config, reminderDays: clamped };
+      setConfig(next);
+      persist(next);
+    },
+    [config, persist]
+  );
 
   const handleTest = async () => {
     if (!config.webhook) {
       setTestResult("error");
       return;
     }
-
     const result = await testReminder(config);
     setTestResult(result ? "success" : "error");
-  };
-
-  const handleTypeChange = (type: ReminderType) => {
-    handleChange("type", type);
-    setTestResult(null);
   };
 
   const isDingTalk = config.type === "dingtalk";
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-accent-ink mb-6">提醒设置</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-accent-ink">提醒设置</h1>
+        {showSaved && (
+          <span className="text-sm text-accent-green font-medium">✓ 已保存</span>
+        )}
+      </div>
 
       <div className="bg-cream rounded-2xl p-6 shadow-card">
         <div className="flex items-center justify-between mb-6">
@@ -49,7 +86,7 @@ export default function ReminderSettings() {
             <p className="text-sm text-accent-inkMute">开启后，优惠券即将过期时会自动发送提醒</p>
           </div>
           <button
-            onClick={() => handleChange("enabled", !config.enabled)}
+            onClick={handleEnabled}
             className={`relative w-14 h-8 rounded-full transition-colors ${
               config.enabled ? "bg-accent-orange" : "bg-accent-grayLight"
             }`}
@@ -98,9 +135,9 @@ export default function ReminderSettings() {
             <input
               type="text"
               value={config.webhook}
-              onChange={(e) => handleChange("webhook", e.target.value)}
-              placeholder={isDingTalk 
-                ? "https://oapi.dingtalk.com/robot/send?access_token=xxx" 
+              onChange={(e) => handleTextChange("webhook", e.target.value)}
+              placeholder={isDingTalk
+                ? "https://oapi.dingtalk.com/robot/send?access_token=xxx"
                 : "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
               }
               className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink placeholder:text-accent-inkMute focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
@@ -114,7 +151,7 @@ export default function ReminderSettings() {
             <input
               type="password"
               value={config.secret}
-              onChange={(e) => handleChange("secret", e.target.value)}
+              onChange={(e) => handleTextChange("secret", e.target.value)}
               placeholder="如果机器人启用了签名验证，请输入密钥"
               className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink placeholder:text-accent-inkMute focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
             />
@@ -124,30 +161,47 @@ export default function ReminderSettings() {
             <label className="block text-sm font-medium text-accent-ink mb-2">
               提前提醒天数
             </label>
-            <input
-              type="number"
-              min="1"
-              max="30"
-              value={config.reminderDays}
-              onChange={(e) => handleChange("reminderDays", parseInt(e.target.value) || 3)}
-              className="w-32 px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
-            />
-            <span className="ml-2 text-sm text-accent-inkMute">天</span>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={1}
+                max={30}
+                step={1}
+                value={config.reminderDays}
+                onChange={(e) => handleDaysChange(e.target.value)}
+                className="w-32 px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
+              />
+              <span className="text-sm text-accent-inkMute">天</span>
+              <div className="flex gap-2 ml-2">
+                {[3, 5, 7, 10].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => handleDaysChange(String(d))}
+                    className={`px-3 py-1.5 text-sm rounded-full transition ${
+                      config.reminderDays === d
+                        ? "bg-accent-orange text-white font-medium"
+                        : "bg-paper text-accent-ink hover:bg-accent-orange/10"
+                    }`}
+                  >
+                    {d}天
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="mt-6 flex gap-3">
+        <div className="mt-6 flex items-center gap-3">
           <button
             onClick={handleTest}
-            className="px-6 py-2.5 bg-accent-orange hover:bg-accent-orange/90 text-white font-bold rounded-full transition shadow-card"
+            disabled={!config.webhook}
+            className="px-6 py-2.5 bg-accent-orange hover:bg-accent-orange/90 disabled:bg-accent-grayLight disabled:cursor-not-allowed text-white font-bold rounded-full transition shadow-card"
           >
             测试连接
           </button>
           {testResult && (
-            <span className={`ml-2 flex items-center ${
-              testResult === "success" ? "text-green-600" : "text-red-600"
-            }`}>
-              {testResult === "success" ? "✓ 测试成功" : "✗ 测试失败"}
+            <span className={`text-sm ${testResult === "success" ? "text-accent-green" : "text-red-500"}`}>
+              {testResult === "success" ? "✓ 测试成功" : "✗ 测试失败，请检查 Webhook 配置"}
             </span>
           )}
         </div>
