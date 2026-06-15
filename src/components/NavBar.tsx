@@ -1,4 +1,5 @@
 import { Plus, Settings } from "lucide-react";
+import LogoIcon from "./LogoIcon";
 
 interface Props {
   onAdd: () => void;
@@ -10,9 +11,7 @@ export default function NavBar({ onAdd, onSettings }: Props) {
     <header className="sticky top-0 z-20 backdrop-blur bg-cream/80 border-b border-accent-orangeLight/40">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-accent-orange text-white flex items-center justify-center text-xl font-bold shadow-card">
-            🐑
-          </div>
+          <LogoIcon className="w-10 h-10 shadow-card" />
           <div>
             <h1 className="font-display text-xl sm:text-2xl font-bold text-accent-ink">
               羊毛管家
