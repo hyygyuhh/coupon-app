@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun } from "lucide-react";
-import { toggleTheme, getTheme } from "../utils/theme";
+import { toggleTheme, getTheme, type ThemeType } from "../utils/theme";
 import {
   getReminderConfig,
   saveReminderConfig,
@@ -51,8 +51,14 @@ export default function ReminderSettings() {
   const [testing, setTesting] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [theme, setTheme] = useState<ThemeType>(() => getTheme());
   
   const coupons = useCouponStore((state) => state.coupons);
+
+  const handleToggleTheme = useCallback(() => {
+    const newTheme = toggleTheme();
+    setTheme(newTheme);
+  }, []);
 
   const persist = useCallback((next: ReminderConfig) => {
     saveReminderConfig(next);
@@ -471,14 +477,14 @@ export default function ReminderSettings() {
         <p className="text-sm text-accent-inkMute mb-4">选择您喜欢的界面风格</p>
         <div className="flex items-center gap-3">
           <button
-            onClick={toggleTheme}
+            onClick={handleToggleTheme}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
-              getTheme() === "dark"
+              theme === "dark"
                 ? "bg-gray-800 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            {getTheme() === "dark" ? (
+            {theme === "dark" ? (
               <><Moon className="w-4 h-4" /> 深色模式</>
             ) : (
               <><Sun className="w-4 h-4" /> 浅色模式</>
