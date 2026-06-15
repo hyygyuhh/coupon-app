@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun, Calendar, Repeat } from "lucide-react";
+import ToggleSwitch from "./ToggleSwitch";
 import { toggleTheme, getTheme, type ThemeType } from "../utils/theme";
 import {
   getReminderConfig,
@@ -217,20 +218,12 @@ export default function ReminderSettings() {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleEnabled}
-            className={`relative w-16 h-9 rounded-full transition-all duration-300 ${
-              config.enabled
-                ? "bg-accent-orange shadow-lg shadow-accent-orange/30"
-                : "bg-accent-grayLight"
-            }`}
-          >
-            <span
-              className={`absolute top-1 w-7 h-7 bg-white rounded-full shadow-md transition-all duration-300 ${
-                config.enabled ? "translate-x-8" : "translate-x-1"
-              }`}
-            />
-          </button>
+          <ToggleSwitch
+            checked={config.enabled}
+            onChange={handleEnabled}
+            size="lg"
+            aria-label="过期提醒开关"
+          />
         </div>
       </div>
 
@@ -415,20 +408,12 @@ export default function ReminderSettings() {
                   {config.dailyReminder ? "每天在指定时间发送提醒" : "仅在优惠券添加/更新时提醒"}
                 </div>
               </div>
-              <button
-                onClick={handleDailyReminderChange}
-                className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
-                  config.dailyReminder
-                    ? "bg-accent-orange shadow-md shadow-accent-orange/30"
-                    : "bg-accent-grayLight"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
-                    config.dailyReminder ? "translate-x-6" : "translate-x-0.5"
-                  }`}
-                />
-              </button>
+              <ToggleSwitch
+                checked={config.dailyReminder}
+                onChange={handleDailyReminderChange}
+                size="sm"
+                aria-label="每日定时提醒开关"
+              />
             </div>
             {config.dailyReminder && (
               <div className="flex items-center gap-3 pt-4 border-t border-accent-grayLight/50">
