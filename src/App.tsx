@@ -118,7 +118,12 @@ export default function App() {
   if (view === "settings") {
     return (
       <div className="min-h-screen text-accent-ink">
-        <NavBar onAdd={openAdd} onSettings={() => setView("home")} />
+        <NavBar 
+          onAdd={openAdd} 
+          onSettings={() => setView("home")}
+          onHome={() => setView("home")}
+          isHome={false}
+        />
         <ReminderSettings />
         <footer className="text-center pb-8 text-xs text-accent-inkMute">
           🐑 羊毛管家 · 数据保存在你的浏览器本地
@@ -129,7 +134,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen text-accent-ink">
-      <NavBar onAdd={openAdd} onSettings={() => setView("settings")} />
+      <NavBar 
+        onAdd={openAdd} 
+        onSettings={() => setView("settings")}
+        onHome={() => setView("home")}
+        isHome={true}
+      />
       <HeroSection
         total={stats.total}
         soon={stats.soon}
