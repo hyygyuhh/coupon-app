@@ -26,3 +26,13 @@ export async function hmac(
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+/**
+ * 计算文件的 SHA-256 哈希值
+ */
+export async function hashFile(file: File | Blob): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
