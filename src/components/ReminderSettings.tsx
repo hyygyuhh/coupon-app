@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun } from "lucide-react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun, Calendar, Repeat } from "lucide-react";
 import { toggleTheme, getTheme, type ThemeType } from "../utils/theme";
 import {
   getReminderConfig,
@@ -8,6 +8,7 @@ import {
   sendTestReminder,
   type ReminderConfig,
   type ReminderType,
+  type ReminderTimeSlot,
 } from "../utils/reminder";
 import { useCouponStore } from "../store/couponStore";
 import { exportAndDownload } from "../utils/export";
@@ -107,6 +108,27 @@ export default function ReminderSettings() {
       setReminderDaysInput(String(config.reminderDays));
     }
   }, [reminderDaysInput, config.reminderDays]);
+
+  const handleTimeSlotChange = useCallback((timeSlot: ReminderTimeSlot) => {
+    const next = { ...config, timeSlot };
+    setConfig(next);
+    persist(next);
+  }, [config, persist]);
+
+  const handleDailyReminderChange = useCallback(() => {
+    const next = { ...config, dailyReminder: !config.dailyReminder };
+    setConfig(next);
+    persist(next);
+  }, [config, persist]);
+
+  const handleDailyReminderHourChange = useCallback((hourStr: string) => {
+    const parsed = parseInt(hourStr, 10);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) {
+      const next = { ...config, dailyReminderHour: parsed };
+      setConfig(next);
+      persist(next);
+    }
+  }, [config, persist]);
 
   const handleTest = async () => {
     if (!config.webhook) {
@@ -342,6 +364,103 @@ export default function ReminderSettings() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* 提醒时段 */}
+        <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
+          <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-accent-orange" />
+            提醒时段
+          </h3>
+          <p className="text-sm text-accent-inkMute mb-4">选择接收提醒的时间段</p>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { value: "morning" as ReminderTimeSlot, label: "上午", desc: "7:00-12:00" },
+              { value: "afternoon" as ReminderTimeSlot, label: "下午", desc: "12:00-18:00" },
+              { value: "evening" as ReminderTimeSlot, label: "晚上", desc: "18:00-23:00" },
+              { value: "any" as ReminderTimeSlot, label: "随时", desc: "任意时间" },
+            ].map((slot) => (
+              <button
+                key={slot.value}
+                onClick={() => handleTimeSlotChange(slot.value)}
+                className={`p-3 rounded-xl text-center transition-all duration-200 ${
+                  config.timeSlot === slot.value
+                    ? "bg-accent-orange text-white shadow-md shadow-accent-orange/30"
+                    : "bg-paper text-accent-ink hover:bg-accent-orange/10 border border-accent-grayLight"
+                }`}
+              >
+                <div className="font-bold text-sm">{slot.label}</div>
+                <div className={`text-xs mt-0.5 ${
+                  config.timeSlot === slot.value ? "text-white/80" : "text-accent-inkMute"
+                }`}>
+                  {slot.desc}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 每日提醒设置 */}
+        <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
+          <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+            <Repeat className="w-5 h-5 text-accent-orange" />
+            每日提醒
+          </h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-accent-ink">开启每日定时提醒</div>
+                <div className="text-sm text-accent-inkMute mt-0.5">
+                  {config.dailyReminder ? "每天在指定时间发送提醒" : "仅在优惠券添加/更新时提醒"}
+                </div>
+              </div>
+              <button
+                onClick={handleDailyReminderChange}
+                className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
+                  config.dailyReminder
+                    ? "bg-accent-orange shadow-md shadow-accent-orange/30"
+                    : "bg-accent-grayLight"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${
+                    config.dailyReminder ? "translate-x-6" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+            {config.dailyReminder && (
+              <div className="flex items-center gap-3 pt-4 border-t border-accent-grayLight/50">
+                <div className="text-sm text-accent-inkMute">提醒时间</div>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={config.dailyReminderHour}
+                    onChange={(e) => handleDailyReminderHourChange(e.target.value)}
+                    className="w-16 px-3 py-2 bg-paper border border-accent-grayLight rounded-xl text-accent-ink text-center font-bold focus:outline-none focus:ring-2 focus:ring-accent-orange/30 focus:border-accent-orange transition"
+                  />
+                  <span className="text-accent-ink">:00</span>
+                </div>
+                <div className="flex flex-wrap gap-2 ml-2">
+                  {[9, 12, 18, 21].map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => handleDailyReminderHourChange(String(h))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        config.dailyReminderHour === h
+                          ? "bg-accent-orange text-white"
+                          : "bg-paper text-accent-ink hover:bg-accent-orange/10"
+                      }`}
+                    >
+                      {h}:00
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
