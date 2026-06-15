@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings } from "lucide-react";
 import {
   getReminderConfig,
   saveReminderConfig,
@@ -108,8 +109,8 @@ export default function ReminderSettings() {
       {/* 头部 */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-accent-ink flex items-center gap-2">
-            <span className="text-3xl">⚙️</span>
+          <h1 className="text-2xl font-bold text-accent-ink flex items-center gap-3">
+            <Settings className="w-7 h-7 text-accent-orange" />
             设置
           </h1>
           <p className="text-sm text-accent-inkMute mt-1">配置提醒方式和时间</p>
@@ -130,11 +131,15 @@ export default function ReminderSettings() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-colors ${
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
                 config.enabled ? "bg-accent-orange/20" : "bg-accent-grayLight"
               }`}
             >
-              {config.enabled ? "🔔" : "🔕"}
+              {config.enabled ? (
+                <Bell className="w-6 h-6 text-accent-orange" />
+              ) : (
+                <BellOff className="w-6 h-6 text-accent-inkMute" />
+              )}
             </div>
             <div>
               <h2 className="font-bold text-accent-ink text-lg">过期提醒</h2>
@@ -169,7 +174,7 @@ export default function ReminderSettings() {
         {/* 提醒渠道 */}
         <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
           <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
-            <span className="text-lg">📡</span>
+            <Webhook className="w-5 h-5 text-accent-orange" />
             提醒渠道
           </h3>
           <div className="grid grid-cols-2 gap-3">
@@ -217,7 +222,7 @@ export default function ReminderSettings() {
         {/* Webhook 配置 */}
         <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
           <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
-            <span className="text-lg">🔗</span>
+            <Key className="w-5 h-5 text-accent-orange" />
             机器人配置
           </h3>
           <div className="space-y-4">
@@ -255,7 +260,7 @@ export default function ReminderSettings() {
         {/* 提醒时间 */}
         <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
           <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
-            <span className="text-lg">⏰</span>
+            <Clock className="w-5 h-5 text-accent-orange" />
             提前提醒
           </h3>
           <div className="flex items-center gap-4">
@@ -298,7 +303,7 @@ export default function ReminderSettings() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-accent-ink flex items-center gap-2">
-                <span className="text-lg">🧪</span>
+                <FlaskConical className="w-5 h-5 text-accent-orange" />
                 测试连接
               </h3>
               <p className="text-sm text-accent-inkMute mt-1">发送测试消息验证配置是否正确</p>
@@ -330,7 +335,17 @@ export default function ReminderSettings() {
                   : "bg-red-50 text-red-500"
               }`}
             >
-              <span className="text-lg">{testResult === "success" ? "✅" : "❌"}</span>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                testResult === "success" ? "bg-accent-green" : "bg-red-500"
+              }`}>
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {testResult === "success" ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                  )}
+                </svg>
+              </div>
               <span className="text-sm font-medium">
                 {testResult === "success"
                   ? "测试成功！请检查群消息"
@@ -345,7 +360,7 @@ export default function ReminderSettings() {
       {/* 使用说明 */}
       <div className="mt-6 p-5 bg-white/60 rounded-2xl border border-accent-grayLight/30">
         <h3 className="font-medium text-accent-ink mb-3 flex items-center gap-2">
-          <span>💡</span>
+          <Lightbulb className="w-5 h-5 text-accent-orange" />
           如何获取机器人 Webhook
         </h3>
         <div className="text-sm text-accent-inkMute space-y-3">
