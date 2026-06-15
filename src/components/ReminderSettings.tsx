@@ -47,16 +47,38 @@ export default function ReminderSettings() {
     [config, persist]
   );
 
+  const [reminderDaysInput, setReminderDaysInput] = useState<string>(String(config.reminderDays));
+
+  // 同步外部配置变化到输入框
+  useEffect(() => {
+    setReminderDaysInput(String(config.reminderDays));
+  }, [config.reminderDays]);
+
   const handleDaysChange = useCallback(
     (daysStr: string) => {
+      // 允许输入框显示空值或正在输入的值
+      setReminderDaysInput(daysStr);
+      
+      // 只有在有效数字时才保存
       const parsed = parseInt(daysStr, 10);
-      if (isNaN(parsed)) return;
-      const clamped = Math.max(1, Math.min(30, parsed));
-      const next = { ...config, reminderDays: clamped };
-      setConfig(next);
-      persist(next);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
+        const next = { ...config, reminderDays: parsed };
+        setConfig(next);
+        persist(next);
+      }
     },
     [config, persist]
+  );
+
+  const handleDaysBlur = useCallback(
+    () => {
+      // 失去焦点时，如果输入无效则恢复为当前配置值
+      const parsed = parseInt(reminderDaysInput, 10);
+      if (isNaN(parsed) || parsed < 1 || parsed > 30) {
+        setReminderDaysInput(String(config.reminderDays));
+      }
+    },
+    [reminderDaysInput, config.reminderDays]
   );
 
   const handleTest = async () => {
@@ -167,8 +189,9 @@ export default function ReminderSettings() {
                 min={1}
                 max={30}
                 step={1}
-                value={config.reminderDays}
+                value={reminderDaysInput}
                 onChange={(e) => handleDaysChange(e.target.value)}
+                onBlur={handleDaysBlur}
                 className="w-32 px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
               />
               <span className="text-sm text-accent-inkMute">天</span>
