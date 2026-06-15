@@ -13,7 +13,7 @@ function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
       <circle cx="24" cy="24" r="16" fill="#0089FF"/>
-      <path d="M21.5 30.5c-0.55 0-1-0.45-1-1v-7c0-0.55 0.45-1 1-1s1 0.45 1 1v7c0 0.55-0.45 1-1 1zm-5.5-1c-0.55 0-1-0.45-1-1v-3c0-0.55 0.45-1 1-1s1 0.45 1 1v3c0 0.55-0.45 1-1 1zm11 0c-0.55 0-1-0.45-1-1v-3c0-0.55 0.45-1 1-1s1 0.45 1 1v3c0 0.55-0.45 1-1 1zm-11-4c-0.55 0-1-0.45-1-1v-2c0-0.55 0.45-1 1-1s1 0.45 1 1v2c0 0.55-0.45 1-1 1zm11 0c-0.55 0-1-0.45-1-1v-2c0-0.55 0.45-1 1-1s1 0.45 1 1v2c0 0.55-0.45 1-1 1z" fill="white"/>
+      <path d="M18 20h4v8h-4v-8zm6 0h4v8h-4v-8zm6 0h4v8h-4v-8z" fill="white"/>
     </svg>
   );
 }
@@ -23,18 +23,17 @@ function FeishuIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
       <defs>
-        <linearGradient id="feishu-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="feishu-top" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#00D6D9"/>
           <stop offset="100%" stopColor="#6F8FF7"/>
         </linearGradient>
-        <linearGradient id="feishu-bird" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#00D6D9"/>
+        <linearGradient id="feishu-bottom" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4A7AF4"/>
           <stop offset="100%" stopColor="#6F8FF7"/>
         </linearGradient>
       </defs>
-      <path d="M12 24c0-6.627 5.373-12 12-12s12 5.373 12 12-5.373 12-12 12-12-5.373-12-12z" fill="url(#feishu-bg)"/>
-      <path d="M24 14l-8 10 8 10 8-10-8-10z" fill="white"/>
-      <path d="M24 20l-4 6 4 6 4-6-4-6z" fill="url(#feishu-bg)"/>
+      <path d="M16 32 Q24 16 32 32" stroke="url(#feishu-top)" strokeWidth="8" strokeLinecap="round" fill="none"/>
+      <path d="M12 36 Q24 20 36 36" stroke="url(#feishu-bottom)" strokeWidth="8" strokeLinecap="round" fill="none"/>
     </svg>
   );
 }
