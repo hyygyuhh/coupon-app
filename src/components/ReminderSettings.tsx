@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import {
   getReminderConfig,
   saveReminderConfig,
+  testReminder,
   type ReminderConfig,
+  type ReminderType,
 } from "../utils/reminder";
 
-export default function DingTalkSettings() {
+export default function ReminderSettings() {
   const [config, setConfig] = useState<ReminderConfig>(getReminderConfig());
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
 
@@ -25,31 +27,26 @@ export default function DingTalkSettings() {
       return;
     }
 
-    try {
-      const result = await fetch(config.webhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          msgtype: "text",
-          text: { content: "🐑 羊毛管家测试消息：钉钉提醒功能配置成功！" },
-        }),
-      });
-      const data = await result.json();
-      setTestResult(data.errcode === 0 ? "success" : "error");
-    } catch {
-      setTestResult("error");
-    }
+    const result = await testReminder(config);
+    setTestResult(result ? "success" : "error");
   };
+
+  const handleTypeChange = (type: ReminderType) => {
+    handleChange("type", type);
+    setTestResult(null);
+  };
+
+  const isDingTalk = config.type === "dingtalk";
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-accent-ink mb-6">钉钉提醒设置</h1>
+      <h1 className="text-2xl font-bold text-accent-ink mb-6">提醒设置</h1>
 
       <div className="bg-cream rounded-2xl p-6 shadow-card">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="font-bold text-accent-ink">启用钉钉提醒</h2>
-            <p className="text-sm text-accent-inkMute">开启后，优惠券即将过期时会自动发送提醒到钉钉</p>
+            <h2 className="font-bold text-accent-ink">启用过期提醒</h2>
+            <p className="text-sm text-accent-inkMute">开启后，优惠券即将过期时会自动发送提醒</p>
           </div>
           <button
             onClick={() => handleChange("enabled", !config.enabled)}
@@ -68,13 +65,44 @@ export default function DingTalkSettings() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-accent-ink mb-2">
-              钉钉机器人 Webhook
+              提醒渠道
+            </label>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleTypeChange("dingtalk")}
+                className={`flex-1 py-3 px-4 rounded-xl font-medium transition ${
+                  isDingTalk
+                    ? "bg-accent-blue text-white shadow-card"
+                    : "bg-paper text-accent-ink hover:bg-accent-blue/10"
+                }`}
+              >
+                💬 钉钉
+              </button>
+              <button
+                onClick={() => handleTypeChange("feishu")}
+                className={`flex-1 py-3 px-4 rounded-xl font-medium transition ${
+                  !isDingTalk
+                    ? "bg-accent-green text-white shadow-card"
+                    : "bg-paper text-accent-ink hover:bg-accent-green/10"
+                }`}
+              >
+                🦅 飞书
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              {isDingTalk ? "钉钉" : "飞书"}机器人 Webhook
             </label>
             <input
               type="text"
               value={config.webhook}
               onChange={(e) => handleChange("webhook", e.target.value)}
-              placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxx"
+              placeholder={isDingTalk 
+                ? "https://oapi.dingtalk.com/robot/send?access_token=xxx" 
+                : "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+              }
               className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink placeholder:text-accent-inkMute focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
             />
           </div>
@@ -127,9 +155,19 @@ export default function DingTalkSettings() {
         <div className="mt-6 p-4 bg-paper/50 rounded-xl">
           <h3 className="font-medium text-accent-ink mb-2">使用说明</h3>
           <ul className="text-sm text-accent-inkMute space-y-1">
-            <li>1. 在钉钉群中添加「自定义机器人」</li>
-            <li>2. 复制机器人的 Webhook 地址粘贴到上方</li>
-            <li>3. 如果启用了「加签」，请同时填写密钥</li>
+            {isDingTalk ? (
+              <>
+                <li>1. 在钉钉群中添加「自定义机器人」</li>
+                <li>2. 复制机器人的 Webhook 地址粘贴到上方</li>
+                <li>3. 如果启用了「加签」，请同时填写密钥</li>
+              </>
+            ) : (
+              <>
+                <li>1. 在飞书群中添加「自定义机器人」</li>
+                <li>2. 复制机器人的 Webhook 地址粘贴到上方</li>
+                <li>3. 如果启用了「安全设置」中的签名校验，请填写密钥</li>
+              </>
+            )}
             <li>4. 每天只会发送一次提醒，避免打扰</li>
           </ul>
         </div>

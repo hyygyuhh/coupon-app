@@ -1,10 +1,14 @@
 import type { Coupon } from "../types/coupon";
 import { daysUntil } from "./date";
 import { sendDingTalkMessage, buildReminderMarkdown } from "./dingtalk";
+import { sendFeishuMessage, buildFeishuPost } from "./feishu";
 import { loadConfig, saveConfig } from "./storage";
+
+export type ReminderType = "dingtalk" | "feishu";
 
 export interface ReminderConfig {
   enabled: boolean;
+  type: ReminderType;
   webhook: string;
   secret: string;
   reminderDays: number;
@@ -13,6 +17,7 @@ export interface ReminderConfig {
 
 export const DEFAULT_CONFIG: ReminderConfig = {
   enabled: false,
+  type: "dingtalk",
   webhook: "",
   secret: "",
   reminderDays: 3,
@@ -20,12 +25,12 @@ export const DEFAULT_CONFIG: ReminderConfig = {
 };
 
 export function getReminderConfig(): ReminderConfig {
-  const config = loadConfig<ReminderConfig>("dingtalk-config");
+  const config = loadConfig<ReminderConfig>("reminder-config");
   return { ...DEFAULT_CONFIG, ...config };
 }
 
 export function saveReminderConfig(config: ReminderConfig): void {
-  saveConfig("dingtalk-config", config);
+  saveConfig("reminder-config", config);
 }
 
 export function getExpiringCoupons(
@@ -70,19 +75,29 @@ export async function sendReminderIfNeeded(
     daysLeft: daysUntil(c.expiryDate),
   }));
 
-  const markdown = buildReminderMarkdown(reminderData);
-  
-  const success = await sendDingTalkMessage(
-    reminderConfig.webhook,
-    reminderConfig.secret,
-    {
-      msgtype: "markdown",
-      markdown: {
-        title: "优惠券即将过期提醒",
-        text: markdown,
-      },
-    }
-  );
+  let success = false;
+
+  if (reminderConfig.type === "dingtalk") {
+    const markdown = buildReminderMarkdown(reminderData);
+    success = await sendDingTalkMessage(
+      reminderConfig.webhook,
+      reminderConfig.secret,
+      {
+        msgtype: "markdown",
+        markdown: {
+          title: "优惠券即将过期提醒",
+          text: markdown,
+        },
+      }
+    );
+  } else if (reminderConfig.type === "feishu") {
+    const post = buildFeishuPost(reminderData);
+    success = await sendFeishuMessage(
+      reminderConfig.webhook,
+      reminderConfig.secret,
+      post
+    );
+  }
 
   if (success) {
     saveReminderConfig({
@@ -92,4 +107,22 @@ export async function sendReminderIfNeeded(
   }
 
   return success;
+}
+
+export async function testReminder(config: ReminderConfig): Promise<boolean> {
+  if (!config.webhook) return false;
+
+  if (config.type === "dingtalk") {
+    return await sendDingTalkMessage(config.webhook, config.secret, {
+      msgtype: "text",
+      text: { content: "🐑 羊毛管家测试消息：提醒功能配置成功！" },
+    });
+  } else if (config.type === "feishu") {
+    return await sendFeishuMessage(config.webhook, config.secret, {
+      msg_type: "text",
+      content: JSON.stringify({ text: "🐑 羊毛管家测试消息：提醒功能配置成功！" }),
+    });
+  }
+
+  return false;
 }

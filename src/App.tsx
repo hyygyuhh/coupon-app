@@ -4,7 +4,7 @@ import HeroSection from "./components/HeroSection";
 import CouponList from "./components/CouponList";
 import EmptyState from "./components/EmptyState";
 import CouponModal from "./components/CouponModal";
-import DingTalkSettings from "./components/DingTalkSettings";
+import ReminderSettings from "./components/ReminderSettings";
 import { useCouponStore } from "./store/couponStore";
 import type { Coupon, CouponInput } from "./types/coupon";
 import { daysUntil } from "./utils/date";
@@ -118,7 +118,7 @@ export default function App() {
     return (
       <div className="min-h-screen text-accent-ink">
         <NavBar onAdd={openAdd} onSettings={() => setView("home")} />
-        <DingTalkSettings />
+        <ReminderSettings />
         <footer className="text-center pb-8 text-xs text-accent-inkMute">
           🐑 羊毛管家 · 数据保存在你的浏览器本地
         </footer>
