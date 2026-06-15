@@ -193,7 +193,7 @@ export async function sendReminderIfNeeded(
     );
   }
 
-  if (success && !reminderConfig.dailyReminder) {
+  if (success) {
     needReminder.forEach((c) => markCouponAsRemindedToday(c.coupon.id));
   }
 
