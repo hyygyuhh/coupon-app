@@ -95,18 +95,34 @@ function extractExpiryDate(text: string): string | undefined {
 
   const thisYear = new Date().getFullYear();
   const candidates: { date: string; score: number }[] = [];
+  const today = todayYYYYMMDD();
+
+  // 特殊处理：有效期范围格式 "2026.04.26-2029.04.26有效"
+  // 这种格式中，第二个日期是到期日期
+  const dateRangePattern = /(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?\s*[-~—–]\s*(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?\s*(有效|到期)/;
+  const rangeMatch = text.match(dateRangePattern);
+  if (rangeMatch) {
+    const y = parseInt(rangeMatch[4], 10);
+    const m = parseInt(rangeMatch[5], 10);
+    const d = parseInt(rangeMatch[6], 10);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      const expiryDate = normalizeDate(y, m, d);
+      // 有效期范围的结束日期置信度最高
+      candidates.push({ date: expiryDate, score: 1.1 });
+      return expiryDate; // 直接返回，优先级最高
+    }
+  }
 
   // 1. 相对日期：今天/明天/后天 + 过期
   const relativePattern = /(今天|今日|明天|明日|后天|昨日|昨天)\s*(?:\d{1,2}[:：]\d{1,2})?\s*(?:过期|到期|使用|有效|截止|前使用)/;
   const relativeMatch = text.match(relativePattern);
   if (relativeMatch) {
     const keyword = relativeMatch[1];
-    const base = todayYYYYMMDD();
+    const base = today;
     let rel = base;
     if (/明天|明日/.test(keyword)) rel = addDays(base, 1);
     else if (/后天/.test(keyword)) rel = addDays(base, 2);
     else if (/昨天|昨日/.test(keyword)) rel = addDays(base, -1);
-    // 相对日期置信度较低（给 0.7 分），因为容易被 OCR 误识别为"今天"
     candidates.push({ date: rel, score: 0.7 });
   }
 
@@ -124,7 +140,10 @@ function extractExpiryDate(text: string): string | undefined {
     const around = text.slice(Math.max(0, fm.index - 15), fm.index + fm[0].length + 15);
     // 关键词附近的日期置信度更高
     const hasKeyword = /(有效期|有效至|使用|到期|过期|截止|止|至|前使用|前有效)/.test(around);
-    candidates.push({ date, score: hasKeyword ? 1.0 : 0.8 });
+    // 如果日期在今天之后，置信度更高
+    const isFuture = date >= today;
+    const score = hasKeyword ? (isFuture ? 1.0 : 0.8) : (isFuture ? 0.8 : 0.6);
+    candidates.push({ date, score });
   }
 
   // 3. 短日期（无年）但有"过期/到期/有效期"等关键词
@@ -135,7 +154,8 @@ function extractExpiryDate(text: string): string | undefined {
     const m = parseInt(sm[1], 10);
     const d = parseInt(sm[2], 10);
     if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      candidates.push({ date: normalizeDate(thisYear, m, d), score: 0.9 });
+      const date = normalizeDate(thisYear, m, d);
+      candidates.push({ date, score: 0.9 });
     }
   }
 
@@ -146,7 +166,8 @@ function extractExpiryDate(text: string): string | undefined {
     const m = parseInt(cm[1], 10);
     const d = parseInt(cm[2], 10);
     if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      candidates.push({ date: normalizeDate(thisYear, m, d), score: 0.85 });
+      const date = normalizeDate(thisYear, m, d);
+      candidates.push({ date, score: 0.85 });
     }
   }
 
@@ -158,7 +179,8 @@ function extractExpiryDate(text: string): string | undefined {
       const m = parseInt(fm2[1], 10);
       const d = parseInt(fm2[2], 10);
       if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-        candidates.push({ date: normalizeDate(thisYear, m, d), score: 0.6 });
+        const date = normalizeDate(thisYear, m, d);
+        candidates.push({ date, score: 0.6 });
       }
     }
   }
@@ -169,7 +191,6 @@ function extractExpiryDate(text: string): string | undefined {
   //   1. 先按置信度（score）从高到低
   //   2. 同置信度取"距离今天较远"的日期（通常是到期日，而非今天）
   //   3. 避免取过去的日期（除非别无选择）
-  const today = todayYYYYMMDD();
   candidates.sort((a, b) => {
     if (Math.abs(b.score - a.score) > 0.15) return b.score - a.score;
     // 高置信度的日期，取较晚的那个
@@ -216,6 +237,10 @@ function extractAmount(text: string): string | undefined {
     // 反向：名称在前，金额在后 "惊喜红包 38元"
     const reverseMatch = line.match(/[\u4e00-\u9fa5]{2,}\s+(\d+(?:\.\d+)?)\s*元\s*(?!.*\d)/);
     if (reverseMatch) return `¥${reverseMatch[1]}`;
+
+    // 增强：匹配 "¥0.01元面值" 这种格式（京东E卡常见）
+    const faceValueMatch = line.match(/[¥￥]\s*(\d+(?:\.\d+)?)\s*元\s*面值/);
+    if (faceValueMatch) return `¥${faceValueMatch[1]}`;
   }
 
   // 策略 B：通用正则扫描全文
@@ -231,17 +256,25 @@ function extractAmount(text: string): string | undefined {
   const zheMatch = text.match(/(\d(?:\.\d)?)\s*折/);
   if (zheMatch) return `${zheMatch[1]}折`;
 
-  // B4：直接 ¥ / ￥ + 数字
-  const rmbMatch = text.match(/[¥￥]\s*(\d+(?:\.\d+)?)/);
+  // B4：直接 ¥ / ￥ + 数字（增强：支持小数点）
+  const rmbMatch = text.match(/[¥￥]\s*(\d+(?:\.\d{1,2})?)/);
   if (rmbMatch) return `¥${rmbMatch[1]}`;
 
   // B5：末尾"X元"（非满减语境）
-  const yuanMatch = text.match(/(\d+(?:\.\d+)?)\s*元(?!.*可用)/);
+  const yuanMatch = text.match(/(\d+(?:\.\d{1,2})?)\s*元(?!.*可用)/);
   if (yuanMatch) return `¥${yuanMatch[1]}`;
 
   // B6：减至X元
-  const jianzhi = text.match(/减至\s*(\d+(?:\.\d+)?)\s*元?/);
+  const jianzhi = text.match(/减至\s*(\d+(?:\.\d{1,2})?)\s*元?/);
   if (jianzhi) return `¥${jianzhi[1]}`;
+
+  // B7：增强：匹配 "XX.XX元面值" 格式
+  const faceValueMatch2 = text.match(/(\d+(?:\.\d{1,2})?)\s*元面值/);
+  if (faceValueMatch2) return `¥${faceValueMatch2[1]}`;
+
+  // B8：兜底：匹配任何看起来像金额的数字（带小数点优先）
+  const anyMoneyMatch = text.match(/(\d+\.\d{1,2})\s*元/);
+  if (anyMoneyMatch) return `¥${anyMoneyMatch[1]}`;
 
   return undefined;
 }
@@ -504,7 +537,7 @@ function stripOcrNoise(line: string): string {
 
 /**
  * 判断一行是否像"券卡标题行"
- * 规则简化：必须包含金额信号或券/红包关键字 + 中文名称
+ * 规则：必须包含金额信号或券/红包关键字 + 中文名称
  */
 function lineLooksLikeTitle(line: string): boolean {
   if (!line || line.length < 3) return false;
@@ -516,7 +549,7 @@ function lineLooksLikeTitle(line: string): boolean {
   if (looksLikeUI(cleaned)) return false;
 
   // 正面信号
-  // 1. "38元 ..." / "0.01元..."
+  // 1. "38元 ..." / "0.01元..."（金额在前）
   if (/^\d+(?:\.\d+)?\s*元\s/.test(cleaned)) return true;
   // 2. "减至/立减 X元..."
   if (/(减至|立减|立省)\s*\d+(?:\.\d+)?\s*元?/.test(cleaned)) return true;
@@ -529,6 +562,8 @@ function lineLooksLikeTitle(line: string): boolean {
   if (/\d+\s*折/.test(cleaned) && /[\u4e00-\u9fa5]{2,}/.test(cleaned)) return true;
   // 6. 含"券/红包/补贴" + 金额数字 + 中文
   if (/(券|红包|补贴)/.test(cleaned) && /\d/.test(cleaned) && /[\u4e00-\u9fa5]{2,}/.test(cleaned)) return true;
+  // 7. 京东E卡特殊格式："京东E卡" + 金额
+  if (/京东.?[Ee]卡/.test(cleaned) && /[\d.]+/.test(cleaned)) return true;
 
   return false;
 }
@@ -563,6 +598,8 @@ export function splitCouponBlocks(rawText: string): string[] {
   anchors.sort((a, b) => a - b);
 
   const blocks: string[] = [];
+  const seenBlocks = new Set<string>(); // 去重
+
   for (let k = 0; k < anchors.length; k++) {
     const anchor = anchors[k];
     // 范围：从当前锚点前 1 行（不跨过前一个锚点）到后 2 行（不跨过下一个锚点）
@@ -573,7 +610,13 @@ export function splitCouponBlocks(rawText: string): string[] {
     const end = Math.min(nextAnchor - 1, anchor + 2, lines.length - 1);
 
     const block = lines.slice(start, end + 1).join("\n").trim();
-    if (block.length >= 10) blocks.push(block);
+    
+    // 去重：检查是否已经添加过相似的块
+    const blockHash = block.toLowerCase().replace(/\s+/g, "");
+    if (block.length >= 10 && !seenBlocks.has(blockHash)) {
+      blocks.push(block);
+      seenBlocks.add(blockHash);
+    }
   }
 
   return blocks.length > 0 ? blocks : [rawText];
