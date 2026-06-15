@@ -12,9 +12,8 @@ import {
 function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="24" fill="#0089FF"/>
-      <path d="M24 8C15.16 8 8 15.16 8 24s7.16 16 16 16 16-7.16 16-16S32.84 8 24 8zm8.24 22.32c-.64.96-2.08 1.76-3.28 1.76H19.04c-1.2 0-2.64-.8-3.28-1.76l-3.44-5.12c-.64-.96-.64-2.56 0-3.52l3.44-5.12c.64-.96 2.08-1.76 3.28-1.76h9.92c1.2 0 2.64.8 3.28 1.76l3.44 5.12c.64.96.64 2.56 0 3.52l-3.44 5.12z" fill="white"/>
-      <path d="M27.2 20.8l-3.2 4.8-3.2-4.8h2.4v-4.8h1.6v4.8h2.4z" fill="white"/>
+      <circle cx="24" cy="24" r="16" fill="#0089FF"/>
+      <path d="M21.5 30.5c-0.55 0-1-0.45-1-1v-7c0-0.55 0.45-1 1-1s1 0.45 1 1v7c0 0.55-0.45 1-1 1zm-5.5-1c-0.55 0-1-0.45-1-1v-3c0-0.55 0.45-1 1-1s1 0.45 1 1v3c0 0.55-0.45 1-1 1zm11 0c-0.55 0-1-0.45-1-1v-3c0-0.55 0.45-1 1-1s1 0.45 1 1v3c0 0.55-0.45 1-1 1zm-11-4c-0.55 0-1-0.45-1-1v-2c0-0.55 0.45-1 1-1s1 0.45 1 1v2c0 0.55-0.45 1-1 1zm11 0c-0.55 0-1-0.45-1-1v-2c0-0.55 0.45-1 1-1s1 0.45 1 1v2c0 0.55-0.45 1-1 1z" fill="white"/>
     </svg>
   );
 }
@@ -23,15 +22,19 @@ function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
 function FeishuIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="24" fill="url(#feishu-gradient)"/>
       <defs>
-        <linearGradient id="feishu-gradient" x1="0" y1="0" x2="48" y2="48">
+        <linearGradient id="feishu-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00D6D9"/>
+          <stop offset="100%" stopColor="#6F8FF7"/>
+        </linearGradient>
+        <linearGradient id="feishu-bird" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#00D6D9"/>
           <stop offset="100%" stopColor="#6F8FF7"/>
         </linearGradient>
       </defs>
-      <path d="M32.5 15.5L24 12l-8.5 3.5L12 24l3.5 8.5L24 36l8.5-3.5L36 24l-3.5-8.5z" fill="white" fillOpacity="0.9"/>
-      <path d="M24 18l-4 6 4 6 4-6-4-6z" fill="url(#feishu-gradient)"/>
+      <path d="M12 24c0-6.627 5.373-12 12-12s12 5.373 12 12-5.373 12-12 12-12-5.373-12-12z" fill="url(#feishu-bg)"/>
+      <path d="M24 14l-8 10 8 10 8-10-8-10z" fill="white"/>
+      <path d="M24 20l-4 6 4 6 4-6-4-6z" fill="url(#feishu-bg)"/>
     </svg>
   );
 }
