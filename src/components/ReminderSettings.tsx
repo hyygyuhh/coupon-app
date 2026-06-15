@@ -119,17 +119,25 @@ export default function ReminderSettings() {
     }
     setTestingReminder(true);
     setTestReminderResult(null);
-    const result = await sendTestReminder(coupons, config);
-    if (result) {
-      setTestReminderResult("success");
-    } else {
-      const expiringCount = coupons.filter(c => {
-        if (c.status !== "unused") return false;
-        const d = (new Date(c.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-        return d >= 0 && d <= config.reminderDays;
-      }).length;
-      setTestReminderResult(expiringCount === 0 ? "no_coupons" : "error");
+    
+    const expiringCoupons = coupons.filter(c => {
+      if (c.status !== "unused") return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const target = new Date(c.expiryDate);
+      target.setHours(0, 0, 0, 0);
+      const d = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return d >= 0 && d <= config.reminderDays;
+    });
+    
+    if (expiringCoupons.length === 0) {
+      setTestReminderResult("no_coupons");
+      setTestingReminder(false);
+      return;
     }
+    
+    const result = await sendTestReminder(coupons, config);
+    setTestReminderResult(result ? "success" : "error");
     setTestingReminder(false);
   };
 
