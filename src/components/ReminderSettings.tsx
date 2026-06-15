@@ -13,7 +13,9 @@ function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
       <circle cx="24" cy="24" r="16" fill="#0089FF"/>
-      <path d="M18 20h4v8h-4v-8zm6 0h4v8h-4v-8zm6 0h4v8h-4v-8z" fill="white"/>
+      <path d="M20 22l-4 8 4 8 4-8-4-8z" fill="white"/>
+      <path d="M28 22l-4 8 4 8 4-8-4-8z" fill="white"/>
+      <path d="M24 26l-2 4 2 4 2-4-2-4z" fill="#0089FF"/>
     </svg>
   );
 }
@@ -23,17 +25,17 @@ function FeishuIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
       <defs>
-        <linearGradient id="feishu-top" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="feishu-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#00D6D9"/>
           <stop offset="100%" stopColor="#6F8FF7"/>
         </linearGradient>
-        <linearGradient id="feishu-bottom" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="feishu-gradient-2" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#4A7AF4"/>
           <stop offset="100%" stopColor="#6F8FF7"/>
         </linearGradient>
       </defs>
-      <path d="M16 32 Q24 16 32 32" stroke="url(#feishu-top)" strokeWidth="8" strokeLinecap="round" fill="none"/>
-      <path d="M12 36 Q24 20 36 36" stroke="url(#feishu-bottom)" strokeWidth="8" strokeLinecap="round" fill="none"/>
+      <path d="M14 28 Q24 12 34 28" stroke="url(#feishu-gradient-1)" strokeWidth="6" strokeLinecap="round" fill="none"/>
+      <path d="M10 34 Q24 18 38 34" stroke="url(#feishu-gradient-2)" strokeWidth="6" strokeLinecap="round" fill="none"/>
     </svg>
   );
 }
