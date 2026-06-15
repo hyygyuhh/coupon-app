@@ -4,7 +4,16 @@
 
 html, body, #root {
   min-height: 100%;
+}
+
+.light body,
+.light #root {
   background: linear-gradient(180deg, #FFF8EC 0%, #FFF2D8 100%);
+}
+
+.dark body,
+.dark #root {
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
 }
 
 body {
@@ -20,6 +29,10 @@ body {
   overflow: hidden;
 }
 
+.dark .coupon-card {
+  background: #2d2d44;
+}
+
 .coupon-card::before,
 .coupon-card::after {
   content: "";
@@ -33,6 +46,11 @@ body {
   z-index: 2;
 }
 
+.dark .coupon-card::before,
+.dark .coupon-card::after {
+  background: #1a1a2e;
+}
+
 .coupon-card::before { left: -10px; }
 .coupon-card::after { right: -10px; }
 
@@ -40,3 +58,65 @@ body {
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #FFB088; border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+.dark ::-webkit-scrollbar-thumb { background: #4a4a6a; }
+
+/* 表单输入框样式 */
+.input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid rgba(255, 176, 136, 0.5);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #2B2D42;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dark .input {
+  background: #2d2d44;
+  border-color: rgba(100, 100, 130, 0.5);
+  color: #e0e0e0;
+}
+
+.input:focus {
+  border-color: #FF6B35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+}
+
+.dark .input:focus {
+  border-color: #FF6B35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+}
+
+/* 表单错误样式 */
+.input-error {
+  border-color: #EF4444;
+}
+
+.input-error:focus {
+  border-color: #EF4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+/* 深色模式文字颜色 */
+.dark .text-accent-ink {
+  color: #e0e0e0;
+}
+
+.dark .text-accent-inkMute {
+  color: #9090a0;
+}
+
+.dark .bg-cream {
+  background: #2d2d44;
+}
+
+.dark .bg-paper {
+  background: #252538;
+}
+
+.dark .border-accent-grayLight {
+  border-color: rgba(100, 100, 130, 0.3);
+}

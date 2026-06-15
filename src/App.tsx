@@ -10,6 +10,7 @@ import type { Coupon, CouponInput } from "./types/coupon";
 import { daysUntil } from "./utils/date";
 import { preloadOCR } from "./utils/ocrService";
 import { sendReminderIfNeeded } from "./utils/reminder";
+import { REMINDER_DELAY_MS, EXPIRED_REFRESH_INTERVAL_MS, OCR_PRELOAD_DELAY_MS } from "./utils/constants";
 
 type View = "home" | "settings";
 
@@ -28,7 +29,7 @@ export default function App() {
 
   useEffect(() => {
     refreshExpired();
-    const timer = window.setInterval(refreshExpired, 60 * 60 * 1000);
+    const timer = window.setInterval(refreshExpired, EXPIRED_REFRESH_INTERVAL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") refreshExpired();
     };
@@ -44,14 +45,14 @@ export default function App() {
       preloadOCR((progress, status) => {
         console.log(`OCR 预加载: ${(progress * 100).toFixed(0)}% - ${status}`);
       });
-    }, 1000);
+    }, OCR_PRELOAD_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
       await sendReminderIfNeeded(coupons);
-    }, 5000);
+    }, REMINDER_DELAY_MS);
     return () => clearTimeout(timer);
   }, [coupons]);
 

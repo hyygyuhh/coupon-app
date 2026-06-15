@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle } from "lucide-react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun } from "lucide-react";
+import { toggleTheme, getTheme } from "../utils/theme";
 import {
   getReminderConfig,
   saveReminderConfig,
@@ -9,6 +10,7 @@ import {
   type ReminderType,
 } from "../utils/reminder";
 import { useCouponStore } from "../store/couponStore";
+import { exportAndDownload } from "../utils/export";
 
 // 钉钉官方图标
 function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
@@ -457,6 +459,56 @@ export default function ReminderSettings() {
               </span>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* 主题切换 */}
+      <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
+        <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+          <Moon className="w-5 h-5 text-accent-orange" />
+          外观主题
+        </h3>
+        <p className="text-sm text-accent-inkMute mb-4">选择您喜欢的界面风格</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleTheme}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+              getTheme() === "dark"
+                ? "bg-gray-800 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {getTheme() === "dark" ? (
+              <><Moon className="w-4 h-4" /> 深色模式</>
+            ) : (
+              <><Sun className="w-4 h-4" /> 浅色模式</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* 数据导出 */}
+      <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
+        <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+          <Download className="w-5 h-5 text-accent-orange" />
+          数据备份
+        </h3>
+        <p className="text-sm text-accent-inkMute mb-4">导出优惠券数据，便于备份或迁移</p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => exportAndDownload(coupons, { format: "json" })}
+            className="flex items-center gap-2 px-4 py-2.5 bg-accent-blue/10 text-accent-blue rounded-xl font-medium hover:bg-accent-blue/20 transition-all duration-200"
+          >
+            <FileJson className="w-4 h-4" />
+            导出 JSON
+          </button>
+          <button
+            onClick={() => exportAndDownload(coupons, { format: "csv" })}
+            className="flex items-center gap-2 px-4 py-2.5 bg-accent-green/10 text-accent-green rounded-xl font-medium hover:bg-accent-green/20 transition-all duration-200"
+          >
+            <FileText className="w-4 h-4" />
+            导出 CSV
+          </button>
         </div>
       </div>
 

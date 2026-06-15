@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Camera, Check, Copy, X } from "lucide-react";
+import { Camera, Check, Copy, X, AlertCircle } from "lucide-react";
 import type { Coupon, CouponInput } from "../types/coupon";
 import { recognizeImage } from "../utils/ocrService";
 import {
@@ -7,6 +7,7 @@ import {
   parseMultipleCoupons,
   type CouponCandidate,
 } from "../utils/ocrParser";
+import { VALIDATION_MESSAGES } from "../utils/constants";
 
 interface Props {
   open: boolean;
@@ -37,6 +38,7 @@ const STATUS_ZH: Record<string, string> = {
 export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
   const [form, setForm] = useState<CouponInput>(empty);
   const [tagsInput, setTagsInput] = useState("");
+  const [errors, setErrors] = useState<Partial<Record<keyof CouponInput, string>>>({});
 
   // OCR 相关状态
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -86,12 +88,17 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
   const update = <K extends keyof CouponInput>(key: K, value: CouponInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const validateForm = (): boolean => {
+    const newErrors: Partial<Record<keyof CouponInput, string>> = {};
+    if (!form.name.trim()) newErrors.name = VALIDATION_MESSAGES.REQUIRED;
+    if (!form.platform.trim()) newErrors.platform = VALIDATION_MESSAGES.REQUIRED;
+    if (!form.expiryDate) newErrors.expiryDate = VALIDATION_MESSAGES.REQUIRED;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const submit = () => {
-    const name = form.name.trim();
-    const platform = form.platform.trim();
-    if (!name) return alert("请填写券名称");
-    if (!platform) return alert("请填写平台/商家");
-    if (!form.expiryDate) return alert("请选择过期日期");
+    if (!validateForm()) return;
     const tags = tagsInput
       .split(/[,，]/)
       .map((s) => s.trim())
@@ -340,9 +347,9 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
 
         {/* —— 表单字段 —— */}
         <div className="px-6 py-5 space-y-4">
-          <Field label="券名称 *">
+          <Field label="券名称 *" error={errors.name}>
             <input
-              className="input"
+              className={`input ${errors.name ? "input-error" : ""}`}
               placeholder="例如：瑞幸咖啡免单券"
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
@@ -350,9 +357,9 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="平台 / 商家 *">
+            <Field label="平台 / 商家 *" error={errors.platform}>
               <input
-                className="input"
+                className={`input ${errors.platform ? "input-error" : ""}`}
                 placeholder="例如：瑞幸 / 淘宝"
                 value={form.platform}
                 onChange={(e) => update("platform", e.target.value)}
@@ -368,10 +375,10 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
             </Field>
           </div>
 
-          <Field label="过期日期 *">
+          <Field label="过期日期 *" error={errors.expiryDate}>
             <input
               type="date"
-              className="input"
+              className={`input ${errors.expiryDate ? "input-error" : ""}`}
               value={form.expiryDate}
               onChange={(e) => update("expiryDate", e.target.value)}
             />
@@ -432,23 +439,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
         </div>
       </div>
 
-      <style>{`
-        .input {
-          width: 100%;
-          background: #ffffff;
-          border: 1px solid rgba(255, 176, 136, 0.5);
-          border-radius: 12px;
-          padding: 10px 14px;
-          font-size: 14px;
-          color: #2B2D42;
-          outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .input:focus {
-          border-color: #FF6B35;
-          box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
-        }
-      `}</style>
+      
     </div>
   );
 }
@@ -456,9 +447,11 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
 function Field({
   label,
   children,
+  error,
 }: {
   label: string;
   children: React.ReactNode;
+  error?: string;
 }) {
   return (
     <label className="block">
@@ -466,6 +459,12 @@ function Field({
         {label}
       </span>
       {children}
+      {error && (
+        <div className="flex items-center gap-1 mt-1.5 text-xs text-red-500 bg-red-50 rounded-lg px-2 py-1.5">
+          <AlertCircle size={12} />
+          <span>{error}</span>
+        </div>
+      )}
     </label>
   );
 }

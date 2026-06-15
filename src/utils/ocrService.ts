@@ -11,6 +11,7 @@
 
 import { createWorker, Worker, createScheduler, Scheduler } from "tesseract.js";
 import { processImage, type ProcessedImage } from "./imageProcessor";
+import { hashFile } from "./crypto";
 
 export interface OCRResult {
   text: string;
@@ -21,6 +22,91 @@ export interface OCRResult {
     confidence: number;
     width: number;
   }[];
+}
+
+interface OCRCacheEntry {
+  result: OCRResult;
+  timestamp: number;
+}
+
+const CACHE_KEY_PREFIX = "ocr_cache_";
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_CACHE_SIZE = 50;
+
+async function getCacheKey(file: File): Promise<string> {
+  const hash = await hashFile(file);
+  return CACHE_KEY_PREFIX + hash;
+}
+
+async function getCachedResult(file: File): Promise<OCRResult | null> {
+  try {
+    const key = await getCacheKey(file);
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
+    
+    const entry: OCRCacheEntry = JSON.parse(stored);
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return entry.result;
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedResult(file: File, result: OCRResult): Promise<void> {
+  try {
+    const key = await getCacheKey(file);
+    const entry: OCRCacheEntry = {
+      result,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(key, JSON.stringify(entry));
+    cleanupCache();
+  } catch {
+    // 忽略存储错误
+  }
+}
+
+function cleanupCache(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(CACHE_KEY_PREFIX)) {
+        keys.push(key);
+      }
+    }
+    
+    if (keys.length <= MAX_CACHE_SIZE) return;
+    
+    keys.sort((a, b) => {
+      const entryA = JSON.parse(localStorage.getItem(a) || "{}");
+      const entryB = JSON.parse(localStorage.getItem(b) || "{}");
+      return (entryA.timestamp || 0) - (entryB.timestamp || 0);
+    });
+    
+    const toRemove = keys.slice(0, keys.length - MAX_CACHE_SIZE);
+    for (const key of toRemove) {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // 忽略清理错误
+  }
+}
+
+export function clearOCRCache(): void {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(CACHE_KEY_PREFIX)) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // 忽略清理错误
+  }
 }
 
 // 全局 Worker 实例（单例模式）
@@ -237,6 +323,13 @@ export async function recognizeImage(
 ): Promise<OCRResult> {
   onProgress?.(0, "正在读取图片");
 
+  const cached = await getCachedResult(file);
+  if (cached) {
+    console.log("[OCR] 使用缓存结果");
+    onProgress?.(1, "识别完成");
+    return cached;
+  }
+
   const startTime = performance.now();
 
   // 步骤 1：并行生成图片变体
@@ -321,12 +414,16 @@ export async function recognizeImage(
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
     console.log(`[OCR] 完成，${rounds.length} 轮扫描，平均置信度 ${finalConfidence.toFixed(1)}，耗时 ${elapsed}s`);
 
-    onProgress?.(1, "识别完成");
-    return {
+    const result: OCRResult = {
       text: merged,
       confidence: finalConfidence,
       rounds,
     };
+
+    setCachedResult(file, result);
+
+    onProgress?.(1, "识别完成");
+    return result;
   } finally {
     // 清理
     for (const v of variants) {
