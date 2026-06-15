@@ -151,10 +151,7 @@ export async function sendReminderIfNeeded(
   }
 
   const needReminder = expiring.filter((c) => {
-    if (!reminderConfig.dailyReminder) {
-      return !hasCouponBeenRemindedToday(c.coupon.id);
-    }
-    return true;
+    return !hasCouponBeenRemindedToday(c.coupon.id);
   });
 
   if (needReminder.length === 0) {
