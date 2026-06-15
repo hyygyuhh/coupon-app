@@ -52,46 +52,26 @@ export function buildFeishuPost(coupons: {
   if (coupons.length === 0) {
     return {
       msg_type: "text",
-      content: JSON.stringify({ text: "暂无即将过期的优惠券" }),
+      content: JSON.stringify({ text: "🐑 羊毛管家提醒：暂无即将过期的优惠券" }),
     };
   }
 
-  const rows: string[][] = [];
-  rows.push([
-    `<font color="#1a1a1a"><b>🐑 优惠券即将过期提醒</b></font>`,
-  ]);
-  rows.push([
-    `<font color="#666666">检测到 <b>${coupons.length}</b> 张优惠券即将过期，请及时使用！</font>`,
-  ]);
-  rows.push([""]);
+  let text = `🐑 羊毛管家提醒：检测到 ${coupons.length} 张优惠券即将过期！\n\n`;
   
-  rows.push([
-    `<table><tr><th>优惠券名称</th><th>平台</th><th>到期时间</th><th>剩余天数</th></tr>`,
-  ]);
-
   coupons.forEach((c) => {
     const daysText = c.daysLeft === 0 
-      ? `<b><font color="#ff4d4f">今天过期</font></b>` 
+      ? "今天过期" 
       : c.daysLeft === 1 
-        ? `<b><font color="#faad14">明天过期</font></b>` 
+        ? "明天过期" 
         : `剩 ${c.daysLeft} 天`;
-    rows.push([
-      `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.platform)}</td><td>${c.expiryDate}</td><td>${daysText}</td></tr>`,
-    ]);
+    text += `• ${c.name} (${c.platform}) - ${c.expiryDate} (${daysText})\n`;
   });
-
-  rows.push(["</table>"]);
-  rows.push([""]);
-  rows.push([`<font color="#fa8c16">请尽快使用，避免浪费！💰</font>`]);
+  
+  text += "\n请尽快使用，避免浪费！💰";
 
   return {
-    msg_type: "post",
-    post: {
-      zh_cn: {
-        title: "优惠券即将过期提醒",
-        content: rows,
-      },
-    },
+    msg_type: "text",
+    content: JSON.stringify({ text }),
   };
 }
 
