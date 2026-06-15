@@ -5,6 +5,7 @@ import { isExpired } from "../utils/date";
 
 interface CouponState {
   coupons: Coupon[];
+  setCoupons: (coupons: Coupon[]) => void;
   addCoupon: (input: CouponInput) => void;
   updateCoupon: (id: string, input: CouponInput) => void;
   markUsed: (id: string) => void;
@@ -32,6 +33,17 @@ export const useCouponStore = create<CouponState>((set, get) => {
 
   return {
     coupons: normalized,
+
+    setCoupons: (coupons) => {
+      const normalized = coupons.map((c) => {
+        if (c.status === "unused" && isExpired(c.expiryDate)) {
+          return { ...c, status: "expired" as const, updatedAt: nowISO() };
+        }
+        return c;
+      });
+      saveCoupons(normalized);
+      set({ coupons: normalized });
+    },
 
     addCoupon: (input) => {
       const now = nowISO();

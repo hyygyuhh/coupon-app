@@ -1,0 +1,40 @@
+name: Daily Coupon Reminder
+
+on:
+  schedule:
+    # 每天北京时间9:00执行 (UTC 1:00)
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    # 支持手动触发
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run reminder check
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+        run: node scripts/check-reminders.js
+
+      - name: Send reminder notification
+        if: success()
+        run: |
+          echo "Reminder check completed successfully"
+
+      - name: Handle failure
+        if: failure()
+        run: |
+          echo "Reminder check failed. Will retry on next schedule."

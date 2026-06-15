@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun, Calendar, Repeat } from "lucide-react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun, Calendar, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check } from "lucide-react";
 import ToggleSwitch from "./ToggleSwitch";
 import { toggleTheme, getTheme, type ThemeType } from "../utils/theme";
 import {
@@ -11,6 +11,14 @@ import {
   type ReminderType,
   type ReminderTimeSlot,
 } from "../utils/reminder";
+import {
+  getSyncConfig,
+  saveSyncConfig,
+  syncToCloud,
+  restoreFromCloud,
+  getSyncStatusText,
+  type CloudSyncConfig,
+} from "../utils/cloudSync";
 import { useCouponStore } from "../store/couponStore";
 import { exportAndDownload } from "../utils/export";
 
@@ -55,7 +63,13 @@ export default function ReminderSettings() {
   const [showSaved, setShowSaved] = useState(false);
   const [theme, setTheme] = useState<ThemeType>(() => getTheme());
   
+  // 云同步状态
+  const [syncConfig, setSyncConfig] = useState<CloudSyncConfig>(() => getSyncConfig());
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<"success" | "error" | null>(null);
+  
   const coupons = useCouponStore((state) => state.coupons);
+  const setCoupons = useCouponStore((state) => state.setCoupons);
 
   const handleToggleTheme = useCallback(() => {
     const newTheme = toggleTheme();
@@ -130,6 +144,50 @@ export default function ReminderSettings() {
       persist(next);
     }
   }, [config, persist]);
+
+  // 云同步处理函数
+  const handleSyncEnabled = useCallback(() => {
+    const next = { ...syncConfig, enabled: !syncConfig.enabled };
+    setSyncConfig(next);
+    saveSyncConfig(next);
+  }, [syncConfig]);
+
+  const handleSyncTokenChange = useCallback((value: string) => {
+    const next = { ...syncConfig, token: value };
+    setSyncConfig(next);
+    saveSyncConfig(next);
+  }, [syncConfig]);
+
+  const handleSyncGistIdChange = useCallback((value: string) => {
+    const next = { ...syncConfig, gistId: value };
+    setSyncConfig(next);
+    saveSyncConfig(next);
+  }, [syncConfig]);
+
+  const handleSyncToCloud = useCallback(async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    const success = await syncToCloud(coupons);
+    setSyncResult(success ? "success" : "error");
+    if (success) {
+      setSyncConfig(getSyncConfig());
+    }
+    setSyncing(false);
+  }, [coupons]);
+
+  const handleRestoreFromCloud = useCallback(async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    const cloudCoupons = await restoreFromCloud();
+    if (cloudCoupons) {
+      setCoupons(cloudCoupons);
+      setSyncResult("success");
+      setSyncConfig(getSyncConfig());
+    } else {
+      setSyncResult("error");
+    }
+    setSyncing(false);
+  }, [setCoupons]);
 
   const handleTest = async () => {
     if (!config.webhook) {
@@ -594,6 +652,144 @@ export default function ReminderSettings() {
               <><Sun className="w-4 h-4" /> 浅色模式</>
             )}
           </button>
+        </div>
+      </div>
+
+      {/* 云同步设置 */}
+      <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-accent-ink flex items-center gap-2">
+            {syncConfig.enabled ? (
+              <Cloud className="w-5 h-5 text-accent-blue" />
+            ) : (
+              <CloudOff className="w-5 h-5 text-accent-inkMute" />
+            )}
+            云同步
+          </h3>
+          <ToggleSwitch
+            checked={syncConfig.enabled}
+            onChange={handleSyncEnabled}
+            size="sm"
+            aria-label="云同步开关"
+          />
+        </div>
+        <p className="text-sm text-accent-inkMute mb-4">
+          开启后可将数据同步到 GitHub Gist，配合 GitHub Actions 实现每日定时提醒
+        </p>
+        
+        <div
+          className={`space-y-4 transition-all duration-300 ${
+            syncConfig.enabled ? "opacity-100 max-h-[500px]" : "opacity-50 max-h-0 overflow-hidden"
+          }`}
+        >
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              GitHub Personal Access Token
+            </label>
+            <input
+              type="password"
+              value={syncConfig.token}
+              onChange={(e) => handleSyncTokenChange(e.target.value)}
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              className="w-full px-4 py-3.5 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-accent-orange/30 focus:border-accent-orange transition"
+            />
+            <p className="text-xs text-accent-inkMute mt-1">
+              需要 Gist 权限，可在 GitHub Settings → Developer settings → Personal access tokens 生成
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              Gist ID
+            </label>
+            <input
+              type="text"
+              value={syncConfig.gistId}
+              onChange={(e) => handleSyncGistIdChange(e.target.value)}
+              placeholder="8a1b2c3d4e5f6g7h8i9j0k..."
+              className="w-full px-4 py-3.5 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-accent-orange/30 focus:border-accent-orange transition"
+            />
+            <p className="text-xs text-accent-inkMute mt-1">
+              Gist 创建后，URL 中的 ID 部分。例如 https://gist.github.com/user/<span className="font-mono bg-gray-100 px-1 rounded">这里就是Gist ID</span>
+            </p>
+          </div>
+          
+          {/* 同步状态和操作 */}
+          <div className="flex items-center justify-between pt-4 border-t border-accent-grayLight/50">
+            <div className="text-sm text-accent-inkMute flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" />
+              {getSyncStatusText(syncConfig)}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSyncToCloud}
+                disabled={!syncConfig.token || !syncConfig.gistId || syncing}
+                className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                  syncConfig.token && syncConfig.gistId && !syncing
+                    ? "bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                {syncing ? (
+                  <><span className="animate-spin"><RefreshCw className="w-4 h-4" /></span> 同步中...</>
+                ) : (
+                  <><Upload className="w-4 h-4" /> 上传数据</>
+                )}
+              </button>
+              <button
+                onClick={handleRestoreFromCloud}
+                disabled={!syncConfig.token || !syncConfig.gistId || syncing}
+                className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+                  syncConfig.token && syncConfig.gistId && !syncing
+                    ? "bg-accent-green/10 text-accent-green hover:bg-accent-green/20"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                <Download className="w-4 h-4" />
+                恢复数据
+              </button>
+            </div>
+          </div>
+          
+          {syncResult && (
+            <div
+              className={`p-3 rounded-xl flex items-center gap-2 ${
+                syncResult === "success"
+                  ? "bg-accent-green/10 text-accent-green"
+                  : "bg-red-50 text-red-500"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                syncResult === "success" ? "bg-accent-green" : "bg-red-500"
+              }`}>
+                {syncResult === "success" ? (
+                  <Check className="w-3 h-3 text-white" />
+                ) : (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm font-medium">
+                {syncResult === "success" ? "同步成功！" : "同步失败，请检查配置"}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        {/* 使用说明 */}
+        <div className="mt-4 p-4 bg-blue-50 rounded-xl">
+          <h4 className="font-medium text-accent-blue mb-2 flex items-center gap-2">
+            <Lightbulb className="w-4 h-4" />
+            如何启用每日自动提醒？
+          </h4>
+          <ol className="text-sm text-accent-blue/80 space-y-1 list-decimal list-inside">
+            <li>在 GitHub 创建 Personal Access Token（需要 Gist 权限）</li>
+            <li>创建一个新的 GitHub Gist，上传空的 coupons.json 和 reminder-status.json</li>
+            <li>将 Token 和 Gist ID 填入上方配置</li>
+            <li>点击「上传数据」测试同步是否成功</li>
+            <li>在仓库设置中添加 secrets（GH_TOKEN, GIST_ID, FEISHU_WEBHOOK 等）</li>
+          </ol>
         </div>
       </div>
 
