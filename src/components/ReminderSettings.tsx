@@ -10,243 +10,344 @@ import {
 export default function ReminderSettings() {
   const [config, setConfig] = useState<ReminderConfig>(() => getReminderConfig());
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
+  const [testing, setTesting] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
-  // 写回本地存储
   const persist = useCallback((next: ReminderConfig) => {
     saveReminderConfig(next);
     setShowSaved(true);
-    setTimeout(() => setShowSaved(false), 1200);
+    setTimeout(() => setShowSaved(false), 1500);
   }, []);
 
-  const handleEnabled = useCallback(
-    () => {
-      const next = { ...config, enabled: !config.enabled };
-      setConfig(next);
-      persist(next);
-    },
-    [config, persist]
-  );
+  const handleEnabled = useCallback(() => {
+    const next = { ...config, enabled: !config.enabled };
+    setConfig(next);
+    persist(next);
+  }, [config, persist]);
 
-  const handleTypeChange = useCallback(
-    (type: ReminderType) => {
-      const next = { ...config, type };
-      setConfig(next);
-      persist(next);
-      setTestResult(null);
-    },
-    [config, persist]
-  );
+  const handleTypeChange = useCallback((type: ReminderType) => {
+    const next = { ...config, type };
+    setConfig(next);
+    persist(next);
+    setTestResult(null);
+  }, [config, persist]);
 
-  const handleTextChange = useCallback(
-    (key: "webhook" | "secret", value: string) => {
-      const next = { ...config, [key]: value };
-      setConfig(next);
-      persist(next);
-    },
-    [config, persist]
-  );
+  const handleTextChange = useCallback((key: "webhook" | "secret", value: string) => {
+    const next = { ...config, [key]: value };
+    setConfig(next);
+    persist(next);
+  }, [config, persist]);
 
-  const [reminderDaysInput, setReminderDaysInput] = useState<string>(String(config.reminderDays));
+  const [reminderDaysInput, setReminderDaysInput] = useState(String(config.reminderDays));
 
-  // 同步外部配置变化到输入框
   useEffect(() => {
     setReminderDaysInput(String(config.reminderDays));
   }, [config.reminderDays]);
 
-  const handleDaysChange = useCallback(
-    (daysStr: string) => {
-      // 允许输入框显示空值或正在输入的值
-      setReminderDaysInput(daysStr);
-      
-      // 只有在有效数字时才保存
-      const parsed = parseInt(daysStr, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
-        const next = { ...config, reminderDays: parsed };
-        setConfig(next);
-        persist(next);
-      }
-    },
-    [config, persist]
-  );
+  const handleDaysChange = useCallback((daysStr: string) => {
+    setReminderDaysInput(daysStr);
+    const parsed = parseInt(daysStr, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
+      const next = { ...config, reminderDays: parsed };
+      setConfig(next);
+      persist(next);
+    }
+  }, [config, persist]);
 
-  const handleDaysBlur = useCallback(
-    () => {
-      // 失去焦点时，如果输入无效则恢复为当前配置值
-      const parsed = parseInt(reminderDaysInput, 10);
-      if (isNaN(parsed) || parsed < 1 || parsed > 30) {
-        setReminderDaysInput(String(config.reminderDays));
-      }
-    },
-    [reminderDaysInput, config.reminderDays]
-  );
+  const handleDaysBlur = useCallback(() => {
+    const parsed = parseInt(reminderDaysInput, 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > 30) {
+      setReminderDaysInput(String(config.reminderDays));
+    }
+  }, [reminderDaysInput, config.reminderDays]);
 
   const handleTest = async () => {
     if (!config.webhook) {
       setTestResult("error");
       return;
     }
+    setTesting(true);
+    setTestResult(null);
     const result = await testReminder(config);
     setTestResult(result ? "success" : "error");
+    setTesting(false);
   };
 
   const isDingTalk = config.type === "dingtalk";
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-accent-ink">提醒设置</h1>
-        {showSaved && (
-          <span className="text-sm text-accent-green font-medium">✓ 已保存</span>
-        )}
+    <div className="max-w-2xl mx-auto px-4 py-6 pb-12">
+      {/* 头部 */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-accent-ink flex items-center gap-2">
+            <span className="text-3xl">⚙️</span>
+            设置
+          </h1>
+          <p className="text-sm text-accent-inkMute mt-1">配置提醒方式和时间</p>
+        </div>
+        <div
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+            showSaved
+              ? "bg-accent-green/20 text-accent-green scale-100 opacity-100"
+              : "scale-90 opacity-0"
+          }`}
+        >
+          ✓ 已保存
+        </div>
       </div>
 
-      <div className="bg-cream rounded-2xl p-6 shadow-card">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="font-bold text-accent-ink">启用过期提醒</h2>
-            <p className="text-sm text-accent-inkMute">开启后，优惠券即将过期时会自动发送提醒</p>
+      {/* 主开关卡片 */}
+      <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-colors ${
+                config.enabled ? "bg-accent-orange/20" : "bg-accent-grayLight"
+              }`}
+            >
+              {config.enabled ? "🔔" : "🔕"}
+            </div>
+            <div>
+              <h2 className="font-bold text-accent-ink text-lg">过期提醒</h2>
+              <p className="text-sm text-accent-inkMute">
+                {config.enabled ? "已开启 · 每天自动提醒" : "已关闭"}
+              </p>
+            </div>
           </div>
           <button
             onClick={handleEnabled}
-            className={`relative w-14 h-8 rounded-full transition-colors ${
-              config.enabled ? "bg-accent-orange" : "bg-accent-grayLight"
+            className={`relative w-16 h-9 rounded-full transition-all duration-300 ${
+              config.enabled
+                ? "bg-accent-orange shadow-lg shadow-accent-orange/30"
+                : "bg-accent-grayLight"
             }`}
           >
             <span
-              className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                config.enabled ? "translate-x-7" : "translate-x-1"
+              className={`absolute top-1 w-7 h-7 bg-white rounded-full shadow-md transition-all duration-300 ${
+                config.enabled ? "translate-x-8" : "translate-x-1"
               }`}
             />
           </button>
         </div>
+      </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-accent-ink mb-2">
-              提醒渠道
-            </label>
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleTypeChange("dingtalk")}
-                className={`flex-1 py-3 px-4 rounded-xl font-medium transition ${
-                  isDingTalk
-                    ? "bg-accent-blue text-white shadow-card"
-                    : "bg-paper text-accent-ink hover:bg-accent-blue/10"
-                }`}
-              >
-                💬 钉钉
-              </button>
-              <button
-                onClick={() => handleTypeChange("feishu")}
-                className={`flex-1 py-3 px-4 rounded-xl font-medium transition ${
-                  !isDingTalk
-                    ? "bg-accent-green text-white shadow-card"
-                    : "bg-paper text-accent-ink hover:bg-accent-green/10"
-                }`}
-              >
-                🦅 飞书
-              </button>
+      {/* 配置区域 - 仅在开启时显示 */}
+      <div
+        className={`transition-all duration-500 overflow-hidden ${
+          config.enabled ? "opacity-100 max-h-[2000px]" : "opacity-0 max-h-0"
+        }`}
+      >
+        {/* 提醒渠道 */}
+        <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
+          <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+            <span className="text-lg">📡</span>
+            提醒渠道
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleTypeChange("dingtalk")}
+              className={`relative p-4 rounded-2xl border-2 transition-all duration-200 ${
+                isDingTalk
+                  ? "border-accent-blue bg-accent-blue/5"
+                  : "border-accent-grayLight hover:border-accent-blue/30 bg-paper"
+              }`}
+            >
+              <div className="text-3xl mb-2">💬</div>
+              <div className="font-bold text-accent-ink">钉钉</div>
+              <div className="text-xs text-accent-inkMute mt-1">企业办公首选</div>
+              {isDingTalk && (
+                <div className="absolute top-2 right-2 w-5 h-5 bg-accent-blue rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">✓</span>
+                </div>
+              )}
+            </button>
+            <button
+              onClick={() => handleTypeChange("feishu")}
+              className={`relative p-4 rounded-2xl border-2 transition-all duration-200 ${
+                !isDingTalk
+                  ? "border-accent-green bg-accent-green/5"
+                  : "border-accent-grayLight hover:border-accent-green/30 bg-paper"
+              }`}
+            >
+              <div className="text-3xl mb-2">🦅</div>
+              <div className="font-bold text-accent-ink">飞书</div>
+              <div className="text-xs text-accent-inkMute mt-1">字节跳动出品</div>
+              {!isDingTalk && (
+                <div className="absolute top-2 right-2 w-5 h-5 bg-accent-green rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">✓</span>
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Webhook 配置 */}
+        <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
+          <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+            <span className="text-lg">🔗</span>
+            机器人配置
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-accent-ink mb-2">
+                Webhook 地址
+              </label>
+              <input
+                type="text"
+                value={config.webhook}
+                onChange={(e) => handleTextChange("webhook", e.target.value)}
+                placeholder={isDingTalk
+                  ? "https://oapi.dingtalk.com/robot/send?access_token=..."
+                  : "https://open.feishu.cn/open-apis/bot/v2/hook/..."
+                }
+                className="w-full px-4 py-3.5 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-accent-orange/30 focus:border-accent-orange transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-accent-ink mb-2">
+                加签密钥
+                <span className="text-accent-inkMute font-normal ml-1">（可选）</span>
+              </label>
+              <input
+                type="password"
+                value={config.secret}
+                onChange={(e) => handleTextChange("secret", e.target.value)}
+                placeholder="如启用签名验证，请填写密钥"
+                className="w-full px-4 py-3.5 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-accent-orange/30 focus:border-accent-orange transition"
+              />
             </div>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-accent-ink mb-2">
-              {isDingTalk ? "钉钉" : "飞书"}机器人 Webhook
-            </label>
-            <input
-              type="text"
-              value={config.webhook}
-              onChange={(e) => handleTextChange("webhook", e.target.value)}
-              placeholder={isDingTalk
-                ? "https://oapi.dingtalk.com/robot/send?access_token=xxx"
-                : "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
-              }
-              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink placeholder:text-accent-inkMute focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-accent-ink mb-2">
-              加签密钥（可选）
-            </label>
-            <input
-              type="password"
-              value={config.secret}
-              onChange={(e) => handleTextChange("secret", e.target.value)}
-              placeholder="如果机器人启用了签名验证，请输入密钥"
-              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink placeholder:text-accent-inkMute focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-accent-ink mb-2">
-              提前提醒天数
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min={1}
-                max={30}
-                step={1}
-                value={reminderDaysInput}
-                onChange={(e) => handleDaysChange(e.target.value)}
-                onBlur={handleDaysBlur}
-                className="w-32 px-4 py-3 bg-paper border border-accent-grayLight rounded-xl text-accent-ink focus:outline-none focus:ring-2 focus:ring-accent-orange/50 focus:border-accent-orange transition"
-              />
-              <span className="text-sm text-accent-inkMute">天</span>
-              <div className="flex gap-2 ml-2">
-                {[3, 5, 7, 10].map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => handleDaysChange(String(d))}
-                    className={`px-3 py-1.5 text-sm rounded-full transition ${
-                      config.reminderDays === d
-                        ? "bg-accent-orange text-white font-medium"
-                        : "bg-paper text-accent-ink hover:bg-accent-orange/10"
-                    }`}
-                  >
-                    {d}天
-                  </button>
-                ))}
+        {/* 提醒时间 */}
+        <div className="bg-white rounded-3xl p-5 shadow-card mb-4 border border-accent-grayLight/50">
+          <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+            <span className="text-lg">⏰</span>
+            提前提醒
+          </h3>
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="text-sm text-accent-inkMute mb-2">优惠券到期前几天提醒</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  step={1}
+                  value={reminderDaysInput}
+                  onChange={(e) => handleDaysChange(e.target.value)}
+                  onBlur={handleDaysBlur}
+                  className="w-20 px-3 py-2.5 bg-paper border border-accent-grayLight rounded-xl text-accent-ink text-center font-bold focus:outline-none focus:ring-2 focus:ring-accent-orange/30 focus:border-accent-orange transition"
+                />
+                <span className="text-accent-inkMute">天</span>
               </div>
             </div>
+            <div className="flex flex-wrap gap-2">
+              {[1, 3, 5, 7].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => handleDaysChange(String(d))}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                    config.reminderDays === d
+                      ? "bg-accent-orange text-white shadow-md shadow-accent-orange/30 scale-105"
+                      : "bg-paper text-accent-ink hover:bg-accent-orange/10 border border-accent-grayLight"
+                  }`}
+                >
+                  {d} 天
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-3">
-          <button
-            onClick={handleTest}
-            disabled={!config.webhook}
-            className="px-6 py-2.5 bg-accent-orange hover:bg-accent-orange/90 disabled:bg-accent-grayLight disabled:cursor-not-allowed text-white font-bold rounded-full transition shadow-card"
-          >
-            测试连接
-          </button>
+        {/* 测试连接 */}
+        <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-accent-ink flex items-center gap-2">
+                <span className="text-lg">🧪</span>
+                测试连接
+              </h3>
+              <p className="text-sm text-accent-inkMute mt-1">发送测试消息验证配置是否正确</p>
+            </div>
+            <button
+              onClick={handleTest}
+              disabled={!config.webhook || testing}
+              className={`px-6 py-3 rounded-2xl font-bold transition-all duration-200 flex items-center gap-2 ${
+                config.webhook && !testing
+                  ? "bg-accent-orange hover:bg-accent-orange/90 text-white shadow-lg shadow-accent-orange/30 hover:scale-105"
+                  : "bg-accent-grayLight text-accent-inkMute cursor-not-allowed"
+              }`}
+            >
+              {testing ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  发送中...
+                </>
+              ) : (
+                <>发送测试</>
+              )}
+            </button>
+          </div>
           {testResult && (
-            <span className={`text-sm ${testResult === "success" ? "text-accent-green" : "text-red-500"}`}>
-              {testResult === "success" ? "✓ 测试成功" : "✗ 测试失败，请检查 Webhook 配置"}
-            </span>
+            <div
+              className={`mt-4 p-3 rounded-xl flex items-center gap-2 ${
+                testResult === "success"
+                  ? "bg-accent-green/10 text-accent-green"
+                  : "bg-red-50 text-red-500"
+              }`}
+            >
+              <span className="text-lg">{testResult === "success" ? "✅" : "❌"}</span>
+              <span className="text-sm font-medium">
+                {testResult === "success"
+                  ? "测试成功！请检查群消息"
+                  : "测试失败，请检查 Webhook 地址是否正确"
+                }
+              </span>
+            </div>
           )}
         </div>
+      </div>
 
-        <div className="mt-6 p-4 bg-paper/50 rounded-xl">
-          <h3 className="font-medium text-accent-ink mb-2">使用说明</h3>
-          <ul className="text-sm text-accent-inkMute space-y-1">
-            {isDingTalk ? (
-              <>
-                <li>1. 在钉钉群中添加「自定义机器人」</li>
-                <li>2. 复制机器人的 Webhook 地址粘贴到上方</li>
-                <li>3. 如果启用了「加签」，请同时填写密钥</li>
-              </>
-            ) : (
-              <>
-                <li>1. 在飞书群中添加「自定义机器人」</li>
-                <li>2. 复制机器人的 Webhook 地址粘贴到上方</li>
-                <li>3. 如果启用了「安全设置」中的签名校验，请填写密钥</li>
-              </>
-            )}
-            <li>4. 每天只会发送一次提醒，避免打扰</li>
-          </ul>
+      {/* 使用说明 */}
+      <div className="mt-6 p-5 bg-white/60 rounded-2xl border border-accent-grayLight/30">
+        <h3 className="font-medium text-accent-ink mb-3 flex items-center gap-2">
+          <span>💡</span>
+          如何获取机器人 Webhook
+        </h3>
+        <div className="text-sm text-accent-inkMute space-y-3">
+          {isDingTalk ? (
+            <ol className="space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>打开钉钉群 → 群设置 → 智能群助手 → 添加机器人</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>选择「自定义」机器人，安全设置勾选「加签」</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>复制 Webhook 地址和加签密钥到上方</span>
+              </li>
+            </ol>
+          ) : (
+            <ol className="space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>打开飞书群 → 设置 → 群机器人 → 添加机器人</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>选择「自定义机器人」，可设置签名校验</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>复制 Webhook 地址到上方</span>
+              </li>
+            </ol>
+          )}
         </div>
       </div>
     </div>
