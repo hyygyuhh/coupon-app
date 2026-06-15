@@ -13,6 +13,7 @@ export interface ReminderConfig {
   secret: string;
   reminderDays: number;
   lastReminderTime: number;
+  testMode: boolean;
 }
 
 export const DEFAULT_CONFIG: ReminderConfig = {
@@ -22,6 +23,7 @@ export const DEFAULT_CONFIG: ReminderConfig = {
   secret: "",
   reminderDays: 3,
   lastReminderTime: 0,
+  testMode: false,
 };
 
 export function getReminderConfig(): ReminderConfig {
@@ -58,7 +60,7 @@ export async function sendReminderIfNeeded(
   const lastTime = reminderConfig.lastReminderTime;
   const oneDay = 24 * 60 * 60 * 1000;
   
-  if (now - lastTime < oneDay) {
+  if (!reminderConfig.testMode && now - lastTime < oneDay) {
     return false;
   }
 
@@ -107,6 +109,54 @@ export async function sendReminderIfNeeded(
   }
 
   return success;
+}
+
+export async function sendTestReminder(
+  coupons: Coupon[],
+  config?: ReminderConfig
+): Promise<boolean> {
+  const reminderConfig = config || getReminderConfig();
+  
+  if (!reminderConfig.enabled || !reminderConfig.webhook) {
+    return false;
+  }
+
+  const expiring = getExpiringCoupons(coupons, reminderConfig.reminderDays);
+  
+  if (expiring.length === 0) {
+    return false;
+  }
+
+  const reminderData = expiring.map((c) => ({
+    name: c.name,
+    platform: c.platform,
+    expiryDate: c.expiryDate,
+    daysLeft: daysUntil(c.expiryDate),
+  }));
+
+  if (reminderConfig.type === "dingtalk") {
+    const markdown = buildReminderMarkdown(reminderData);
+    return await sendDingTalkMessage(
+      reminderConfig.webhook,
+      reminderConfig.secret,
+      {
+        msgtype: "markdown",
+        markdown: {
+          title: "优惠券即将过期提醒",
+          text: markdown,
+        },
+      }
+    );
+  } else if (reminderConfig.type === "feishu") {
+    const post = buildFeishuPost(reminderData);
+    return await sendFeishuMessage(
+      reminderConfig.webhook,
+      reminderConfig.secret,
+      post
+    );
+  }
+
+  return false;
 }
 
 export async function testReminder(config: ReminderConfig): Promise<boolean> {

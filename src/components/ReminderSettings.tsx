@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings } from "lucide-react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle } from "lucide-react";
 import {
   getReminderConfig,
   saveReminderConfig,
   testReminder,
+  sendTestReminder,
   type ReminderConfig,
   type ReminderType,
 } from "../utils/reminder";
+import { useCouponStore } from "../store/couponStore";
 
 // 钉钉官方图标
 function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
@@ -43,8 +45,12 @@ function FeishuIcon({ className = "w-8 h-8" }: { className?: string }) {
 export default function ReminderSettings() {
   const [config, setConfig] = useState<ReminderConfig>(() => getReminderConfig());
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
+  const [testReminderResult, setTestReminderResult] = useState<"success" | "error" | "no_coupons" | null>(null);
   const [testing, setTesting] = useState(false);
+  const [testingReminder, setTestingReminder] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  
+  const coupons = useCouponStore((state) => state.coupons);
 
   const persist = useCallback((next: ReminderConfig) => {
     saveReminderConfig(next);
@@ -104,6 +110,27 @@ export default function ReminderSettings() {
     const result = await testReminder(config);
     setTestResult(result ? "success" : "error");
     setTesting(false);
+  };
+
+  const handleTestReminder = async () => {
+    if (!config.webhook) {
+      setTestReminderResult("error");
+      return;
+    }
+    setTestingReminder(true);
+    setTestReminderResult(null);
+    const result = await sendTestReminder(coupons, config);
+    if (result) {
+      setTestReminderResult("success");
+    } else {
+      const expiringCount = coupons.filter(c => {
+        if (c.status !== "unused") return false;
+        const d = (new Date(c.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+        return d >= 0 && d <= config.reminderDays;
+      }).length;
+      setTestReminderResult(expiringCount === 0 ? "no_coupons" : "error");
+    }
+    setTestingReminder(false);
   };
 
   const isDingTalk = config.type === "dingtalk";
@@ -354,6 +381,70 @@ export default function ReminderSettings() {
                 {testResult === "success"
                   ? "测试成功！请检查群消息"
                   : "测试失败，请检查 Webhook 地址是否正确"
+                }
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 测试过期提醒 */}
+        <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-accent-ink flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-accent-orange" />
+                测试过期提醒
+              </h3>
+              <p className="text-sm text-accent-inkMute mt-1">模拟发送即将过期优惠券的提醒消息</p>
+            </div>
+            <button
+              onClick={handleTestReminder}
+              disabled={!config.webhook || testingReminder}
+              className={`px-6 py-3 rounded-2xl font-bold transition-all duration-200 flex items-center gap-2 ${
+                config.webhook && !testingReminder
+                  ? "bg-accent-orange hover:bg-accent-orange/90 text-white shadow-lg shadow-accent-orange/30 hover:scale-105"
+                  : "bg-accent-grayLight text-accent-inkMute cursor-not-allowed"
+              }`}
+            >
+              {testingReminder ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  发送中...
+                </>
+              ) : (
+                <>发送提醒</>
+              )}
+            </button>
+          </div>
+          {testReminderResult && (
+            <div
+              className={`mt-4 p-3 rounded-xl flex items-center gap-2 ${
+                testReminderResult === "success"
+                  ? "bg-accent-green/10 text-accent-green"
+                  : testReminderResult === "no_coupons"
+                  ? "bg-yellow-50 text-yellow-600"
+                  : "bg-red-50 text-red-500"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                testReminderResult === "success" ? "bg-accent-green" : testReminderResult === "no_coupons" ? "bg-yellow-500" : "bg-red-500"
+              }`}>
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {testReminderResult === "success" ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  ) : testReminderResult === "no_coupons" ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                  )}
+                </svg>
+              </div>
+              <span className="text-sm font-medium">
+                {testReminderResult === "success"
+                  ? "提醒测试成功！请检查群消息"
+                  : testReminderResult === "no_coupons"
+                  ? "没有即将过期的优惠券，无法测试提醒"
+                  : "发送失败，请检查配置"
                 }
               </span>
             </div>
