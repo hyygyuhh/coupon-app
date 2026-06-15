@@ -13,7 +13,7 @@
  */
 
 import { createWorker, Worker } from "tesseract.js";
-import { generateMultiResolution } from "./imageProcessor";
+import { generateMultiResolution, processImage, type ProcessedImage } from "./imageProcessor";
 import { generatePhotoVariants, detectPhotoMode } from "./photoEnhancer";
 
 export interface OCRResult {
@@ -55,18 +55,18 @@ async function getWorker(): Promise<Worker> {
   if (workerPromise) return workerPromise;
 
   workerPromise = (async () => {
-    const worker = await createWorker({
-      langPath: "https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata@main/",
-      logger: (m) => {
-        // 这里的 logger 是全局初始化时的进度，不输出到业务
-        // 实际识别时通过动态挂 logger 来传递进度
-        console.log(`[OCR init] ${m.status}: ${(m.progress * 100).toFixed(0)}%`);
-      },
-    });
+    const worker = await createWorker("chi_sim+eng");
 
-    // 加载中英文语言包
-    await worker.load("chi_sim+eng");
-    await worker.initialize("chi_sim+eng");
+    // 挂一个轻量 logger 用于调试
+    try {
+      (worker as any).logger = (m: any) => {
+        if (m.status === "loading tesseract core" || m.status === "recognizing text") {
+          console.log(`[OCR init] ${m.status}: ${(m.progress * 100).toFixed(0)}%`);
+        }
+      };
+    } catch {
+      // ignore
+    }
 
     return worker;
   })();
@@ -240,6 +240,12 @@ export async function recognizeImage(
       confidence: number;
       width: number;
     }[] = [];
+
+    // 构建扫描计划：每种图片变体 × 3 种 PSM 模式
+    const scanPlan = variants.flatMap((variant, idx) => [
+      { variant, psm: "11" as PSM, label: `变体${idx}(${variant.width}px)-稀疏文本` },
+      { variant, psm: "6" as PSM, label: `变体${idx}(${variant.width}px)-文本块` },
+    ]);
 
     const totalScans = scanPlan.length;
     let scanIdx = 0;

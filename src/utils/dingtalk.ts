@@ -26,7 +26,7 @@ export async function sendDingTalkMessage(
     if (secret) {
       const timestamp = Date.now();
       const stringToSign = `${timestamp}\n${secret}`;
-      const sign = hmac("sha256", stringToSign, secret, "base64");
+      const sign = await hmac("sha256", stringToSign, secret, "base64");
       url = `${webhook}&timestamp=${timestamp}&sign=${encodeURIComponent(sign)}`;
     }
 
