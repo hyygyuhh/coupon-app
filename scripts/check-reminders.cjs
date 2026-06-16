@@ -161,7 +161,13 @@ async function fetchFromGist() {
     }
   });
 
-  const files = response.files || {};
+  // response 格式: { statusCode, data: { files: {...} } }
+  const data = response.data || {};
+  const files = data.files || {};
+  
+  console.log('📦 Gist 响应状态:', response.statusCode);
+  console.log('📁 Gist 文件列表:', Object.keys(files));
+  
   const couponFile = files['coupons.json'];
   const statusFile = files['reminder-status.json'];
 
@@ -240,6 +246,9 @@ function buildFeishuText(coupons) {
 async function main() {
   console.log('🔔 开始检查优惠券提醒...');
   console.log(`📅 提醒阈值：提前 ${REMINDER_DAYS} 天`);
+  console.log(`🔔 提醒类型：${REMINDER_TYPE}`);
+  console.log(`📋 GitHub Token: ${GH_TOKEN ? '已设置' : '未设置'}`);
+  console.log(`📋 Gist ID: ${GIST_ID || '未设置'}`);
 
   // 1. 检查必要配置
   if (!GH_TOKEN || !GIST_ID) {
@@ -276,6 +285,13 @@ async function main() {
   
   console.log(`📅 今日日期：${todayKey}`);
   console.log(`🔍 开始筛选即将过期（${REMINDER_DAYS}天内）的优惠券...`);
+  console.log(`📊 总优惠券数：${data.coupons.length}`);
+  
+  // 打印每张券的详情用于调试
+  data.coupons.forEach(c => {
+    const daysLeft = daysUntil(c.expiryDate);
+    console.log(`  - ${c.name || 'unnamed'}: status=${c.status}, expiryDate=${c.expiryDate}, daysLeft=${daysLeft}`);
+  });
   
   const expiringCoupons = data.coupons
     .filter(c => {
@@ -284,16 +300,23 @@ async function main() {
         return false;
       }
       
-      if (c.status !== 'unused') return false;
+      if (c.status !== 'unused') {
+        console.log(`⏭️ ${c.name}: status=${c.status}，跳过`);
+        return false;
+      }
       
       const daysLeft = daysUntil(c.expiryDate);
-      if (daysLeft < 0 || daysLeft > REMINDER_DAYS) return false;
+      if (daysLeft < 0 || daysLeft > REMINDER_DAYS) {
+        console.log(`⏭️ ${c.name}: daysLeft=${daysLeft}，超出范围[0, ${REMINDER_DAYS}]，跳过`);
+        return false;
+      }
       
       if (todayStatus[c.id] === todayKey) {
         console.log(`⏭️ ${c.name} 今天已提醒，跳过`);
         return false;
       }
       
+      console.log(`✅ ${c.name}: daysLeft=${daysLeft}，符合条件！`);
       return true;
     })
     .map(c => ({
