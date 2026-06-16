@@ -150,6 +150,8 @@ function getTodayKey() {
  * 从 GitHub Gist 获取数据
  */
 async function fetchFromGist() {
+  console.log(`📡 正在请求 Gist API: /gists/${GIST_ID}`);
+  
   const response = await httpRequest({
     hostname: 'api.github.com',
     path: `/gists/${GIST_ID}`,
@@ -157,15 +159,38 @@ async function fetchFromGist() {
     headers: {
       'Authorization': `Bearer ${GH_TOKEN}`,
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'coupon-reminder-script'
+      'User-Agent': 'coupon-reminder-script',
+      'X-GitHub-Api-Version': '2022-11-28'
     }
   });
 
-  // response 格式: { statusCode, data: { files: {...} } }
+  // response 格式: { statusCode, data: {...} }
+  console.log('📦 Gist 响应状态:', response.statusCode);
+  console.log('📦 原始响应数据:', JSON.stringify(response.data).substring(0, 500));
+  
+  // 处理 301/302 重定向
+  if (response.statusCode === 301 || response.statusCode === 302) {
+    console.log('❌ Gist API 返回重定向，请检查 Gist ID 是否正确');
+    console.log('💡 Gist ID 应该是类似 "8a1b2c3d4e5f6g7h8i9j0k" 的格式，不包含用户名');
+    return { coupons: [], status: { remindedToday: {} } };
+  }
+  
+  // 处理 404 错误
+  if (response.statusCode === 404) {
+    console.log('❌ Gist 未找到，请检查 Gist ID 是否正确');
+    console.log('💡 确保 Gist 存在且 Token 有权限访问');
+    return { coupons: [], status: { remindedToday: {} } };
+  }
+  
+  // 处理 401/403 错误
+  if (response.statusCode === 401 || response.statusCode === 403) {
+    console.log('❌ Token 权限不足，请确保 Token 有 gist 权限');
+    return { coupons: [], status: { remindedToday: {} } };
+  }
+  
   const data = response.data || {};
   const files = data.files || {};
   
-  console.log('📦 Gist 响应状态:', response.statusCode);
   console.log('📁 Gist 文件列表:', Object.keys(files));
   
   const couponFile = files['coupons.json'];
@@ -181,6 +206,8 @@ async function fetchFromGist() {
  * 更新 GitHub Gist 数据
  */
 async function updateGist(coupons, status) {
+  console.log('📡 正在更新 Gist...');
+  
   const response = await httpRequest({
     hostname: 'api.github.com',
     path: `/gists/${GIST_ID}`,
@@ -189,7 +216,8 @@ async function updateGist(coupons, status) {
       'Authorization': `Bearer ${GH_TOKEN}`,
       'Accept': 'application/vnd.github+json',
       'Content-Type': 'application/json',
-      'User-Agent': 'coupon-reminder-script'
+      'User-Agent': 'coupon-reminder-script',
+      'X-GitHub-Api-Version': '2022-11-28'
     }
   }, JSON.stringify({
     description: 'Coupon App Data - Auto updated by GitHub Actions',
@@ -199,7 +227,15 @@ async function updateGist(coupons, status) {
     }
   }));
 
-  return response;
+  console.log('📦 Gist 更新响应状态:', response.statusCode);
+  
+  if (response.statusCode === 200 || response.statusCode === 201) {
+    console.log('✅ Gist 更新成功');
+    return true;
+  } else {
+    console.log('❌ Gist 更新失败:', JSON.stringify(response.data));
+    return false;
+  }
 }
 
 /**
