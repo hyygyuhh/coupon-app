@@ -365,8 +365,14 @@ async function main() {
         return false;
       }
       
-      if (todayStatus[c.id] === todayKey) {
-        console.log(`⏭️ ${c.name} 今天已提醒，跳过`);
+      // 使用小写 ID 进行大小写不敏感的去重检查
+      const normalizedId = c.id.toLowerCase();
+      const isReminded = Object.keys(todayStatus).some(
+        key => key.toLowerCase() === normalizedId && todayStatus[key] === todayKey
+      );
+      
+      if (isReminded) {
+        console.log(`⏭️ ${c.name} (id=${c.id}) 今天已提醒，跳过`);
         return false;
       }
       
@@ -375,7 +381,8 @@ async function main() {
     })
     .map(c => ({
       ...c,
-      daysLeft: daysUntil(c.expiryDate)
+      daysLeft: daysUntil(c.expiryDate),
+      normalizedId: c.id.toLowerCase()
     }))
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
@@ -438,13 +445,14 @@ async function main() {
   if (success) {
     console.log('💾 更新提醒状态...');
     expiringCoupons.forEach(c => {
-      data.status.remindedToday[c.id] = todayKey;
+      const normalizedId = (c.normalizedId || c.id.toLowerCase());
+      data.status.remindedToday[normalizedId] = todayKey;
     });
     
     // 清理已删除优惠券的提醒记录
-    const validIds = new Set(data.coupons.map(c => c.id));
+    const validIds = new Set(data.coupons.map(c => c.id.toLowerCase()));
     for (const id of Object.keys(data.status.remindedToday)) {
-      if (!validIds.has(id)) {
+      if (!validIds.has(id.toLowerCase())) {
         console.log(`🗑️ 清理已删除优惠券的提醒记录: ${id}`);
         delete data.status.remindedToday[id];
       }

@@ -110,14 +110,16 @@ export function getNextReminderTime(config: ReminderConfig): number {
 export function hasCouponBeenRemindedToday(couponId: string): boolean {
   const todayKey = getTodayReminderKey();
   const remindedCoupons = loadConfig<string[]>("reminded-coupons-" + todayKey) || [];
-  return remindedCoupons.includes(couponId);
+  const normalizedId = couponId.toLowerCase();
+  return remindedCoupons.some(id => id.toLowerCase() === normalizedId);
 }
 
 export function markCouponAsRemindedToday(couponId: string): void {
   const todayKey = getTodayReminderKey();
   const remindedCoupons = loadConfig<string[]>("reminded-coupons-" + todayKey) || [];
-  if (!remindedCoupons.includes(couponId)) {
-    remindedCoupons.push(couponId);
+  const normalizedId = couponId.toLowerCase();
+  if (!remindedCoupons.some(id => id.toLowerCase() === normalizedId)) {
+    remindedCoupons.push(normalizedId);
     saveConfig("reminded-coupons-" + todayKey, remindedCoupons);
   }
 }

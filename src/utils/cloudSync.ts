@@ -229,21 +229,32 @@ export async function syncToCloud(coupons: Coupon[]): Promise<boolean> {
   // 获取当前的提醒状态（优先使用本地最新状态）
   const todayKey = getTodayKey();
   const status: ReminderStatus = {
-    remindedToday: { ...cloudStatus.remindedToday },
+    remindedToday: {},
   };
 
-  // 从 localStorage 读取今日提醒状态，覆盖云端状态
+  // 从 localStorage 读取今日提醒状态
   try {
     const localStatus = loadConfig<Record<string, string>>(`reminded-coupons-${todayKey}`);
     if (localStatus) {
-      status.remindedToday = { ...status.remindedToday, ...localStatus };
+      // 使用小写 ID 进行归一化
+      Object.keys(localStatus).forEach(key => {
+        status.remindedToday[key.toLowerCase()] = localStatus[key];
+      });
     }
   } catch {
     // 忽略错误
   }
 
+  // 合并云端状态（云端已存在的记录优先，避免被本地清空）
+  Object.keys(cloudStatus.remindedToday).forEach(key => {
+    const normalizedKey = key.toLowerCase();
+    if (!status.remindedToday[normalizedKey]) {
+      status.remindedToday[normalizedKey] = cloudStatus.remindedToday[key];
+    }
+  });
+
   // 清理已删除优惠券的提醒记录
-  const validIds = new Set(coupons.map(c => c.id));
+  const validIds = new Set(coupons.map(c => c.id.toLowerCase()));
   for (const id of Object.keys(status.remindedToday)) {
     if (!validIds.has(id)) {
       delete status.remindedToday[id];
