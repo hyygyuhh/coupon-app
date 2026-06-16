@@ -22,34 +22,32 @@ import {
 import { useCouponStore } from "../store/couponStore";
 import { exportAndDownload } from "../utils/export";
 
-// 钉钉官方图标
 function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="16" fill="#0089FF"/>
-      <path d="M20 22l-4 8 4 8 4-8-4-8z" fill="white"/>
-      <path d="M28 22l-4 8 4 8 4-8-4-8z" fill="white"/>
-      <path d="M24 26l-2 4 2 4 2-4-2-4z" fill="#0089FF"/>
+      <circle cx="24" cy="24" r="18" fill="#0089FF"/>
+      <path d="M20 20 L16 30 L20 38 L24 30 L20 20" fill="white"/>
+      <path d="M28 20 L24 30 L28 38 L32 30 L28 20" fill="white"/>
+      <path d="M22 28 L24 32 L26 28" fill="#0089FF"/>
     </svg>
   );
 }
 
-// 飞书官方图标
 function FeishuIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none">
       <defs>
-        <linearGradient id="feishu-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="feishu-g1" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#00D6D9"/>
-          <stop offset="100%" stopColor="#6F8FF7"/>
+          <stop offset="100%" stopColor="#478DE0"/>
         </linearGradient>
-        <linearGradient id="feishu-gradient-2" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#4A7AF4"/>
+        <linearGradient id="feishu-g2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#478DE0"/>
           <stop offset="100%" stopColor="#6F8FF7"/>
         </linearGradient>
       </defs>
-      <path d="M14 28 Q24 12 34 28" stroke="url(#feishu-gradient-1)" strokeWidth="6" strokeLinecap="round" fill="none"/>
-      <path d="M10 34 Q24 18 38 34" stroke="url(#feishu-gradient-2)" strokeWidth="6" strokeLinecap="round" fill="none"/>
+      <path d="M16 24 Q24 12 32 24" stroke="url(#feishu-g1)" strokeWidth="7" strokeLinecap="round" fill="none"/>
+      <path d="M12 30 Q24 18 36 30" stroke="url(#feishu-g2)" strokeWidth="7" strokeLinecap="round" fill="none"/>
     </svg>
   );
 }

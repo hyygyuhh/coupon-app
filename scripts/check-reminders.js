@@ -32,13 +32,17 @@ function httpRequest(options, postData = null) {
       res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
         try {
-          resolve(JSON.parse(data));
+          const jsonData = JSON.parse(data);
+          resolve({ statusCode: res.statusCode, data: jsonData });
         } catch {
-          resolve(data);
+          resolve({ statusCode: res.statusCode, data });
         }
       });
     });
-    req.on('error', reject);
+    req.on('error', (error) => {
+      console.log('❌ HTTP请求错误:', error.message);
+      reject(error);
+    });
     if (postData) {
       req.write(postData);
     }
@@ -69,43 +73,58 @@ async function sendDingTalkMessage(webhook, secret, message) {
     url += `&timestamp=${timestamp}&sign=${encodeURIComponent(sign)}`;
   }
 
-  return httpRequest({
+  const result = await httpRequest({
     hostname: new URL(url).hostname,
     path: new URL(url).pathname + new URL(url).search,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
   }, JSON.stringify(message));
+
+  if (result.statusCode === 200 && result.data && result.data.errcode === 0) {
+    return true;
+  } else {
+    console.log('❌ 钉钉返回错误:', JSON.stringify(result));
+    return false;
+  }
 }
 
 /**
  * 生成飞书签名
  */
 function generateFeishuSign(secret) {
-  const timestamp = Math.floor(Date.now() / 1000);
-  const stringToSign = `${timestamp}\n${secret}`;
+  const timestamp = Date.now();
+  const nonce = Math.random().toString(36).slice(2, 15);
+  const stringToSign = `${timestamp}\n${nonce}\n${secret}`;
   const crypto = require('crypto');
-  const hmac = crypto.createHmac('sha256', secret);
+  const hmac = crypto.createHmac('sha256', stringToSign);
   hmac.update(stringToSign);
-  const sign = Buffer.from(hmac.digest()).toString('base64');
-  return { timestamp, sign };
+  const sign = hmac.digest().toString('base64');
+  return { timestamp, nonce, sign };
 }
 
 /**
  * 发送飞书消息
  */
 async function sendFeishuMessage(webhook, secret, message) {
-  let body = message;
+  let url = webhook;
   if (secret) {
-    const { timestamp, sign } = generateFeishuSign(secret);
-    body = { ...message, timestamp, sign };
+    const { timestamp, nonce, sign } = generateFeishuSign(secret);
+    url += `&timestamp=${timestamp}&nonce=${nonce}&sign=${encodeURIComponent(sign)}`;
   }
 
-  return httpRequest({
-    hostname: new URL(webhook).hostname,
-    path: new URL(webhook).pathname,
+  const result = await httpRequest({
+    hostname: new URL(url).hostname,
+    path: new URL(url).pathname + new URL(url).search,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
-  }, JSON.stringify(body));
+  }, JSON.stringify(message));
+
+  if (result.statusCode === 200 && result.data && result.data.code === 0) {
+    return true;
+  } else {
+    console.log('❌ 飞书返回错误:', JSON.stringify(result));
+    return false;
+  }
 }
 
 /**
@@ -255,16 +274,21 @@ async function main() {
   const todayKey = getTodayKey();
   const todayStatus = data.status.remindedToday || {};
   
+  console.log(`📅 今日日期：${todayKey}`);
+  console.log(`🔍 开始筛选即将过期（${REMINDER_DAYS}天内）的优惠券...`);
+  
   const expiringCoupons = data.coupons
     .filter(c => {
-      // 只检查未使用的券
+      if (!c.id || !c.expiryDate) {
+        console.log(`⚠️ 跳过无效优惠券数据: ${JSON.stringify(c)}`);
+        return false;
+      }
+      
       if (c.status !== 'unused') return false;
       
-      // 计算剩余天数
       const daysLeft = daysUntil(c.expiryDate);
       if (daysLeft < 0 || daysLeft > REMINDER_DAYS) return false;
       
-      // 检查今天是否已提醒
       if (todayStatus[c.id] === todayKey) {
         console.log(`⏭️ ${c.name} 今天已提醒，跳过`);
         return false;
@@ -278,6 +302,12 @@ async function main() {
     }))
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
+  console.log(`📊 筛选结果：${expiringCoupons.length} 张优惠券需要提醒`);
+  
+  expiringCoupons.forEach(c => {
+    console.log(`  - ${c.name}: ${c.expiryDate} (剩${c.daysLeft}天)`);
+  });
+
   if (expiringCoupons.length === 0) {
     console.log('✅ 没有需要提醒的优惠券');
     return;
@@ -288,35 +318,43 @@ async function main() {
   // 5. 发送提醒
   let success = false;
   
+  console.log(`📤 开始发送 ${REMINDER_TYPE} 提醒...`);
+  
   if (REMINDER_TYPE === 'dingtalk' && hasDingTalk) {
-    console.log('📤 发送钉钉提醒...');
     const markdown = buildDingTalkMarkdown(expiringCoupons);
+    console.log('📝 消息内容:', markdown.substring(0, 100) + '...');
     try {
-      await sendDingTalkMessage(DINGTALK_WEBHOOK, DINGTALK_SECRET, {
+      success = await sendDingTalkMessage(DINGTALK_WEBHOOK, DINGTALK_SECRET, {
         msgtype: 'markdown',
         markdown: {
           title: '优惠券即将过期提醒',
           text: markdown
         }
       });
-      success = true;
-      console.log('✅ 钉钉提醒发送成功');
+      if (success) {
+        console.log('✅ 钉钉提醒发送成功');
+      }
     } catch (error) {
       console.log('❌ 钉钉提醒发送失败:', error.message);
     }
   } else if (REMINDER_TYPE === 'feishu' && hasFeishu) {
-    console.log('📤 发送飞书提醒...');
     const text = buildFeishuText(expiringCoupons);
+    console.log('📝 消息内容:', text.substring(0, 100) + '...');
     try {
-      await sendFeishuMessage(FEISHU_WEBHOOK, FEISHU_SECRET, {
+      success = await sendFeishuMessage(FEISHU_WEBHOOK, FEISHU_SECRET, {
         msg_type: 'text',
-        content: JSON.stringify({ text })
+        content: { text }
       });
-      success = true;
-      console.log('✅ 飞书提醒发送成功');
+      if (success) {
+        console.log('✅ 飞书提醒发送成功');
+      }
     } catch (error) {
       console.log('❌ 飞书提醒发送失败:', error.message);
     }
+  }
+  
+  if (!success) {
+    console.log('❌ 所有提醒渠道发送失败');
   }
 
   // 6. 更新提醒状态
