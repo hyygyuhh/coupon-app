@@ -10,7 +10,7 @@ on:
 jobs:
   send-reminder:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,21 +20,23 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Run reminder check
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
-        run: node scripts/check-reminders.js
-
-      - name: Send reminder notification
-        if: success()
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
+          REMINDER_DAYS: ${{ secrets.REMINDER_DAYS }}
+          REMINDER_TYPE: ${{ secrets.REMINDER_TYPE }}
         run: |
-          echo "Reminder check completed successfully"
+          echo "🚀 启动优惠券提醒检查..."
+          echo "📅 当前时间: $(date -u)"
+          node scripts/check-reminders.cjs
+          echo "✅ 脚本执行完成"
 
       - name: Handle failure
         if: failure()
         run: |
-          echo "Reminder check failed. Will retry on next schedule."
+          echo "❌ 提醒检查失败，请查看上方日志"
