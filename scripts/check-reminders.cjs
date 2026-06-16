@@ -441,6 +441,15 @@ async function main() {
       data.status.remindedToday[c.id] = todayKey;
     });
     
+    // 清理已删除优惠券的提醒记录
+    const validIds = new Set(data.coupons.map(c => c.id));
+    for (const id of Object.keys(data.status.remindedToday)) {
+      if (!validIds.has(id)) {
+        console.log(`🗑️ 清理已删除优惠券的提醒记录: ${id}`);
+        delete data.status.remindedToday[id];
+      }
+    }
+    
     try {
       await updateGist(data.coupons, data.status);
       console.log('✅ 提醒状态已保存');

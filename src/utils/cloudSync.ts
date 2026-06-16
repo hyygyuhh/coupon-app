@@ -215,20 +215,39 @@ export async function syncToCloud(coupons: Coupon[]): Promise<boolean> {
     return false;
   }
 
-  // 获取当前的提醒状态
+  // 先从 Gist 获取现有的提醒状态
+  let cloudStatus: ReminderStatus = { remindedToday: {} };
+  try {
+    const existingData = await fetchFromGist(config.token, config.gistId);
+    if (existingData && existingData.status) {
+      cloudStatus = existingData.status;
+    }
+  } catch {
+    // 忽略错误，使用默认状态
+  }
+
+  // 获取当前的提醒状态（优先使用本地最新状态）
   const todayKey = getTodayKey();
   const status: ReminderStatus = {
-    remindedToday: {},
+    remindedToday: { ...cloudStatus.remindedToday },
   };
 
-  // 从 localStorage 读取今日提醒状态
+  // 从 localStorage 读取今日提醒状态，覆盖云端状态
   try {
     const localStatus = loadConfig<Record<string, string>>(`reminded-coupons-${todayKey}`);
     if (localStatus) {
-      status.remindedToday = localStatus;
+      status.remindedToday = { ...status.remindedToday, ...localStatus };
     }
   } catch {
     // 忽略错误
+  }
+
+  // 清理已删除优惠券的提醒记录
+  const validIds = new Set(coupons.map(c => c.id));
+  for (const id of Object.keys(status.remindedToday)) {
+    if (!validIds.has(id)) {
+      delete status.remindedToday[id];
+    }
   }
 
   const success = await uploadToGist(config.token, config.gistId, coupons, status);
