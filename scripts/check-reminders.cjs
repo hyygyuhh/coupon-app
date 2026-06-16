@@ -24,10 +24,24 @@ const REMINDER_TYPE = process.env.REMINDER_TYPE || 'feishu'; // dingtalk 或 fei
 
 // ============ 工具函数 ============
 
-function httpRequest(options, postData = null) {
+function httpRequest(options, postData = null, maxRedirects = 3) {
   return new Promise((resolve, reject) => {
     const protocol = options.protocol === 'https:' ? https : http;
     const req = protocol.request(options, (res) => {
+      // 处理重定向
+      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location && maxRedirects > 0) {
+        console.log(`🔄 重定向到: ${res.headers.location} (剩余次数: ${maxRedirects - 1})`);
+        const redirectUrl = new URL(res.headers.location);
+        httpRequest({
+          protocol: redirectUrl.protocol,
+          hostname: redirectUrl.hostname,
+          path: redirectUrl.pathname + redirectUrl.search,
+          method: options.method,
+          headers: options.headers
+        }, postData, maxRedirects - 1).then(resolve).catch(reject);
+        return;
+      }
+      
       let data = '';
       res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
@@ -74,6 +88,7 @@ async function sendDingTalkMessage(webhook, secret, message) {
   }
 
   const result = await httpRequest({
+    protocol: new URL(url).protocol,
     hostname: new URL(url).hostname,
     path: new URL(url).pathname + new URL(url).search,
     method: 'POST',
@@ -113,6 +128,7 @@ async function sendFeishuMessage(webhook, secret, message) {
   }
 
   const result = await httpRequest({
+    protocol: new URL(url).protocol,
     hostname: new URL(url).hostname,
     path: new URL(url).pathname + new URL(url).search,
     method: 'POST',
@@ -153,6 +169,7 @@ async function fetchFromGist() {
   console.log(`📡 正在请求 Gist API: /gists/${GIST_ID}`);
   
   const response = await httpRequest({
+    protocol: 'https:',
     hostname: 'api.github.com',
     path: `/gists/${GIST_ID}`,
     method: 'GET',
@@ -209,6 +226,7 @@ async function updateGist(coupons, status) {
   console.log('📡 正在更新 Gist...');
   
   const response = await httpRequest({
+    protocol: 'https:',
     hostname: 'api.github.com',
     path: `/gists/${GIST_ID}`,
     method: 'PATCH',
