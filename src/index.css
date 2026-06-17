@@ -2,35 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CSS 变量定义 */
+:root {
+  --bg-primary: #FFF8EC;
+  --bg-secondary: #FFF2D8;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --text-primary: #2B2D42;
+  --text-secondary: #8D8D92;
+  --text-muted: #6B6B70;
+  --border-color: rgba(255, 176, 136, 0.5);
+  --border-light: rgba(229, 229, 229, 0.8);
+  --shadow-color: rgba(43, 45, 66, 0.15);
+  --scrollbar-thumb: #FFB088;
+  --coupon-notch: #FFF8EC;
+}
+
+.dark {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-card: #2d2d44;
+  --bg-input: #252538;
+  --text-primary: #e0e0e0;
+  --text-secondary: #9090a0;
+  --text-muted: #707080;
+  --border-color: rgba(100, 100, 130, 0.5);
+  --border-light: rgba(100, 100, 130, 0.3);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --scrollbar-thumb: #4a4a6a;
+  --coupon-notch: #1a1a2e;
+}
+
 html, body, #root {
   min-height: 100%;
 }
 
-.light body,
-.light #root {
-  background: linear-gradient(180deg, #FFF8EC 0%, #FFF2D8 100%);
-}
-
-.dark body,
-.dark #root {
-  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
-}
-
 body {
+  background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background 0.3s ease;
 }
 
 /* 卡券形状：左右半圆缺口 */
 .coupon-card {
   position: relative;
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 20px;
   overflow: hidden;
-}
-
-.dark .coupon-card {
-  background: #2d2d44;
+  transition: background 0.3s ease;
 }
 
 .coupon-card::before,
@@ -40,15 +60,11 @@ body {
   top: 50%;
   width: 20px;
   height: 20px;
-  background: #FFF8EC;
+  background: var(--coupon-notch);
   border-radius: 50%;
   transform: translateY(-50%);
   z-index: 2;
-}
-
-.dark .coupon-card::before,
-.dark .coupon-card::after {
-  background: #1a1a2e;
+  transition: background 0.3s ease;
 }
 
 .coupon-card::before { left: -10px; }
@@ -56,36 +72,23 @@ body {
 
 /* 滚动条美化 */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #FFB088; border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-
-.dark ::-webkit-scrollbar-thumb { background: #4a4a6a; }
 
 /* 表单输入框样式 */
 .input {
   width: 100%;
-  background: #ffffff;
-  border: 1px solid rgba(255, 176, 136, 0.5);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 10px 14px;
   font-size: 14px;
-  color: #2B2D42;
+  color: var(--text-primary);
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.dark .input {
-  background: #2d2d44;
-  border-color: rgba(100, 100, 130, 0.5);
-  color: #e0e0e0;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.3s ease;
 }
 
 .input:focus {
-  border-color: #FF6B35;
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
-}
-
-.dark .input:focus {
   border-color: #FF6B35;
   box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
 }
@@ -102,6 +105,230 @@ body {
 
 /* 深色模式文字颜色 */
 .dark .text-accent-ink {
+  color: var(--text-primary);
+}
+
+.dark .text-accent-inkMute {
+  color: var(--text-secondary);
+}
+
+/* 深色模式背景颜色 */
+.dark .bg-cream {
+  background: var(--bg-card);
+}
+
+.dark .bg-paper {
+  background: var(--bg-input);
+}
+
+.dark .bg-white {
+  background: var(--bg-card);
+}
+
+/* 深色模式边框颜色 */
+.dark .border-accent-grayLight {
+  border-color: var(--border-light);
+}
+
+.dark .border-accent-orangeLight\/50 {
+  border-color: var(--border-light);
+}
+
+/* 深色模式阴影 */
+.dark .shadow-card {
+  box-shadow: 0 10px 30px -12px var(--shadow-color);
+}
+
+.dark .shadow-cardHover {
+  box-shadow: 0 20px 40px -12px var(--shadow-color);
+}
+
+/* 深色模式特殊背景 */
+.dark .bg-accent-orangeLight\/20 {
+  background: rgba(255, 176, 136, 0.15);
+}
+
+.dark .bg-accent-orangeLight\/30 {
+  background: rgba(255, 176, 136, 0.2);
+}
+
+.dark .bg-accent-mintLight\/40 {
+  background: rgba(154, 232, 224, 0.15);
+}
+
+.dark .bg-accent-redLight\/30 {
+  background: rgba(255, 143, 163, 0.15);
+}
+
+.dark .bg-accent-red\/10 {
+  background: rgba(231, 29, 54, 0.15);
+}
+
+.dark .bg-accent-orange\/10 {
+  background: rgba(255, 107, 53, 0.15);
+}
+
+.dark .bg-accent-orange\/15 {
+  background: rgba(255, 107, 53, 0.2);
+}
+
+.dark .bg-accent-mint\/20 {
+  background: rgba(46, 196, 182, 0.15);
+}
+
+.dark .bg-accent-mintLight\/30 {
+  background: rgba(154, 232, 224, 0.15);
+}
+
+.dark .bg-accent-mint\/10 {
+  background: rgba(46, 196, 182, 0.1);
+}
+
+.dark .bg-accent-blue\/10 {
+  background: rgba(74, 144, 217, 0.15);
+}
+
+.dark .bg-accent-green\/10 {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.dark .bg-red-50 {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.dark .bg-yellow-50 {
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.dark .bg-blue-50 {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* 深色模式按钮悬停 */
+.dark .hover\:bg-accent-orangeLight\/40:hover {
+  background: rgba(255, 176, 136, 0.2);
+}
+
+.dark .hover\:bg-accent-orangeLight\/60:hover {
+  background: rgba(255, 176, 136, 0.3);
+}
+
+.dark .hover\:bg-accent-redLight\/60:hover {
+  background: rgba(255, 143, 163, 0.25);
+}
+
+.dark .hover\:bg-accent-mintLight:hover {
+  background: rgba(154, 232, 224, 0.2);
+}
+
+.dark .hover\:bg-accent-orangeLight\/30:hover {
+  background: rgba(255, 176, 136, 0.15);
+}
+
+/* 深色模式导航栏 */
+.dark .backdrop-blur {
+  background: rgba(45, 45, 68, 0.9);
+}
+
+/* 深色模式底部导航栏 */
+.dark nav.fixed {
+  background: rgba(45, 45, 68, 0.95);
+}
+
+/* 深色模式模态框背景 */
+.dark .bg-cream\/80 {
+  background: rgba(45, 45, 68, 0.95);
+}
+
+/* 深色模式标签背景 */
+.dark .bg-accent-mintLight\/40 {
+  background: rgba(46, 196, 182, 0.2);
+}
+
+/* 深色模式统计卡片 */
+.dark .bg-white\/60 {
+  background: rgba(45, 45, 68, 0.6);
+}
+
+/* 深色模式进度条 */
+.dark .bg-paper {
+  background: var(--bg-input);
+}
+
+/* 深色模式选择框 */
+.dark .bg-white\/80 {
+  background: rgba(45, 45, 68, 0.8);
+}
+
+/* 深色模式 Toast */
+.dark .bg-accent-mint {
+  background: #2EC4B6;
+}
+
+.dark .bg-accent-red {
+  background: #E71D36;
+}
+
+.dark .bg-accent-blue {
+  background: #4A90D9;
+}
+
+.dark .bg-accent-orange {
+  background: #FF6B35;
+}
+
+/* 深色模式错误边界 */
+.dark .bg-red-100 {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* 深色模式输入框 placeholder */
+.dark .placeholder\:text-accent-inkMute\/60::placeholder {
+  color: rgba(144, 144, 160, 0.6);
+}
+
+/* 深色模式代码/字体 */
+.dark .font-mono {
+  color: var(--text-primary);
+}
+
+/* 深色模式禁用状态 */
+.dark .disabled\:opacity-50:disabled {
+  opacity: 0.5;
+}
+
+.dark .cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+/* 深色模式设置页面卡片 */
+.dark .bg-white {
+  background: #2d2d44;
+}
+
+/* 深色模式边框 */
+.dark .border-accent-grayLight\/50 {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 深色模式输入框 */
+.dark input[type="text"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="date"],
+.dark textarea {
+  background: #252538;
+  border-color: rgba(100, 100, 130, 0.5);
+  color: #e0e0e0;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgba(144, 144, 160, 0.6);
+}
+
+/* 深色模式按钮 */
+.dark .text-accent-ink:not(.text-accent-orange):not(.text-accent-mint):not(.text-accent-red) {
   color: #e0e0e0;
 }
 
@@ -109,14 +336,40 @@ body {
   color: #9090a0;
 }
 
-.dark .bg-cream {
-  background: #2d2d44;
+/* 深色模式选中状态 */
+.dark .bg-accent-orange\/10 {
+  background: rgba(255, 107, 53, 0.2);
 }
 
-.dark .bg-paper {
+.dark .border-accent-orange {
+  border-color: #FF6B35;
+}
+
+/* 深色模式标签文字 */
+.dark label span {
+  color: #9090a0;
+}
+
+/* 深色模式分隔线 */
+.dark .border-t {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 深色模式 hover 状态 */
+.dark .hover\:bg-accent-orange\/10:hover {
+  background: rgba(255, 107, 53, 0.15);
+}
+
+.dark .hover\:bg-paper:hover {
   background: #252538;
 }
 
-.dark .border-accent-grayLight {
-  border-color: rgba(100, 100, 130, 0.3);
+/* 深色模式使用说明区域 */
+.dark .bg-white\/60 {
+  background: rgba(45, 45, 68, 0.6);
+}
+
+/* 深色模式 footer */
+.dark footer {
+  color: #707080;
 }

@@ -17,6 +17,8 @@ export default {
           redLight: "#FF8FA3",
           ink: "#2B2D42",
           inkMute: "#8D8D92",
+          blue: "#4A90D9",
+          grayLight: "#E5E5E5",
         },
       },
       fontFamily: {

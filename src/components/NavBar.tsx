@@ -10,7 +10,7 @@ interface Props {
 
 export default function NavBar({ onAdd, onSettings, onHome, isHome }: Props) {
   return (
-    <header className="sticky top-0 z-20 backdrop-blur bg-cream/80 border-b border-accent-orangeLight/40">
+    <header className="sticky top-0 z-20 backdrop-blur-md bg-cream/80 dark:bg-[#2d2d44]/90 border-b border-accent-orangeLight/40 dark:border-white/10 transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
         <button
           onClick={onHome}
@@ -23,10 +23,10 @@ export default function NavBar({ onAdd, onSettings, onHome, isHome }: Props) {
         >
           <LogoIcon className="w-10 h-10 shadow-card" />
           <div>
-            <h1 className="font-display text-xl sm:text-2xl font-bold text-accent-ink">
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-accent-ink dark:text-white transition-colors">
               羊毛管家
             </h1>
-            <p className="text-xs text-accent-inkMute">
+            <p className="text-xs text-accent-inkMute dark:text-gray-400 transition-colors">
               你的优惠券小助手
             </p>
           </div>
@@ -35,7 +35,7 @@ export default function NavBar({ onAdd, onSettings, onHome, isHome }: Props) {
           <button
             type="button"
             onClick={onSettings}
-            className="p-2 text-accent-inkMute hover:text-accent-orange hover:bg-accent-orangeLight/30 rounded-full transition"
+            className="p-2 text-accent-inkMute dark:text-gray-400 hover:text-accent-orange hover:bg-accent-orangeLight/30 dark:hover:bg-white/10 rounded-full transition"
           >
             <Settings size={20} />
           </button>

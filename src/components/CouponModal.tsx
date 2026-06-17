@@ -180,18 +180,18 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-accent-ink/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-accent-ink/40 dark:bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-cream rounded-3xl shadow-cardHover w-full max-w-lg max-h-[90vh] overflow-y-auto animate-floatUp">
-        <div className="sticky top-0 z-10 bg-cream border-b border-accent-orangeLight/40 px-6 py-4 flex items-center justify-between">
-          <h3 className="font-display text-2xl font-bold text-accent-ink">
+      <div className="relative bg-cream dark:bg-[#2d2d44] rounded-3xl shadow-cardHover w-full max-w-lg max-h-[90vh] overflow-y-auto animate-floatUp transition-colors duration-300">
+        <div className="sticky top-0 z-10 bg-cream dark:bg-[#2d2d44] border-b border-accent-orangeLight/40 dark:border-white/10 px-6 py-4 flex items-center justify-between transition-colors">
+          <h3 className="font-display text-2xl font-bold text-accent-ink dark:text-white transition-colors">
             {coupon ? "编辑券" : "添加新券"}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-paper flex items-center justify-center text-accent-ink transition"
+            className="w-9 h-9 rounded-full hover:bg-paper dark:hover:bg-white/10 flex items-center justify-center text-accent-ink dark:text-white transition"
           >
             <X size={18} />
           </button>
@@ -199,13 +199,13 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
 
         {/* —— 图片识别区 —— */}
         {!coupon && (
-          <div className="mx-6 mt-5 rounded-2xl border-2 border-dashed border-accent-orangeLight bg-white p-4">
+          <div className="mx-6 mt-5 rounded-2xl border-2 border-dashed border-accent-orangeLight dark:border-accent-orange/40 bg-white dark:bg-[#252538] p-4 transition-colors">
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1">
-                <div className="font-bold text-accent-ink text-sm">
+                <div className="font-bold text-accent-ink dark:text-white text-sm transition-colors">
                   📷 上传截图自动识别
                 </div>
-                <div className="text-xs text-accent-inkMute mt-0.5">
+                <div className="text-xs text-accent-inkMute dark:text-gray-400 mt-0.5 transition-colors">
                   支持手机截图，首次使用需下载中文语言包
                 </div>
               </div>
@@ -230,11 +230,11 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
             {/* 进度条 */}
             {ocrLoading && (
               <div className="mt-4">
-                <div className="flex justify-between text-xs text-accent-inkMute mb-1">
+                <div className="flex justify-between text-xs text-accent-inkMute dark:text-gray-400 mb-1 transition-colors">
                   <span>{ocrStatus}</span>
                   <span>{Math.round(ocrProgress * 100)}%</span>
                 </div>
-                <div className="h-1.5 w-full bg-paper rounded-full overflow-hidden">
+                <div className="h-1.5 w-full bg-paper dark:bg-[#1a1a2e] rounded-full overflow-hidden transition-colors">
                   <div
                     className="h-full bg-accent-orange transition-all"
                     style={{ width: `${Math.round(ocrProgress * 100)}%` }}
@@ -245,7 +245,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
 
             {/* 识别结果 / 错误 */}
             {ocrError && (
-              <div className="mt-3 text-xs text-red-500 bg-red-50 rounded-lg p-2">
+              <div className="mt-3 text-xs text-red-500 bg-red-50 dark:bg-red-500/20 rounded-lg p-2 transition-colors">
                 {ocrError}
               </div>
             )}
@@ -256,10 +256,10 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
                   <img
                     src={previewUrl}
                     alt="预览"
-                    className="w-16 h-16 object-cover rounded-xl border border-accent-orangeLight/60 flex-shrink-0"
+                    className="w-16 h-16 object-cover rounded-xl border border-accent-orangeLight/60 dark:border-white/10 flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-accent-inkMute">
+                    <div className="text-xs text-accent-inkMute dark:text-gray-400 transition-colors">
                       共识别到 <b className="text-accent-orange">{candidates.length}</b> 张券
                       {candidates.length > 1 ? "，点击卡片切换" : "，请核对下方字段"}
                     </div>
@@ -290,25 +290,25 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
                           }}
                           className={`w-full text-left rounded-xl border px-3 py-2.5 transition ${
                             active
-                              ? "border-accent-orange bg-accent-orange/10 shadow-card"
-                              : "border-accent-orangeLight/60 bg-white hover:border-accent-orange hover:bg-paper"
+                              ? "border-accent-orange bg-accent-orange/10 dark:bg-accent-orange/20 shadow-card"
+                              : "border-accent-orangeLight/60 dark:border-white/10 bg-white dark:bg-[#252538] hover:border-accent-orange hover:bg-paper dark:hover:bg-white/5"
                           }`}
                         >
                           <div className="flex items-start gap-2">
                             <div
-                              className={`mt-0.5 w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                              className={`mt-0.5 w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors ${
                                 active
                                   ? "bg-accent-orange text-white"
-                                  : "bg-paper text-accent-ink"
+                                  : "bg-paper dark:bg-[#1a1a2e] text-accent-ink dark:text-white"
                               }`}
                             >
                               {active ? <Check size={12} strokeWidth={3} /> : i + 1}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-accent-ink truncate">
+                              <div className="text-sm font-bold text-accent-ink dark:text-white truncate transition-colors">
                                 {c.parsed.name || `第 ${i + 1} 张券`}
                               </div>
-                              <div className="text-xs text-accent-inkMute mt-0.5 truncate">
+                              <div className="text-xs text-accent-inkMute dark:text-gray-400 mt-0.5 truncate transition-colors">
                                 {[
                                   c.parsed.platform,
                                   c.parsed.amount,
@@ -326,9 +326,9 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
                 )}
 
                 {showRaw && (
-                  <div className="mt-3 bg-paper rounded-xl p-2 text-[11px] text-accent-ink whitespace-pre-wrap max-h-40 overflow-y-auto border border-accent-orangeLight/40">
+                  <div className="mt-3 bg-paper dark:bg-[#1a1a2e] rounded-xl p-2 text-[11px] text-accent-ink dark:text-gray-300 whitespace-pre-wrap max-h-40 overflow-y-auto border border-accent-orangeLight/40 dark:border-white/10 transition-colors">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-accent-inkMute">原始文本</span>
+                      <span className="text-accent-inkMute dark:text-gray-400">原始文本</span>
                       <button
                         type="button"
                         onClick={copyRaw}
@@ -421,11 +421,11 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
           </Field>
         </div>
 
-        <div className="sticky bottom-0 bg-cream border-t border-accent-orangeLight/40 px-6 py-4 flex justify-end gap-3">
+        <div className="sticky bottom-0 bg-cream dark:bg-[#2d2d44] border-t border-accent-orangeLight/40 dark:border-white/10 px-6 py-4 flex justify-end gap-3 transition-colors">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-3 sm:px-5 sm:py-2 rounded-full font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 transition min-h-[48px] sm:min-h-auto"
+            className="px-6 py-3 sm:px-5 sm:py-2 rounded-full font-bold text-accent-ink dark:text-white bg-paper dark:bg-[#252538] hover:bg-accent-orangeLight/40 dark:hover:bg-white/10 transition min-h-[48px] sm:min-h-auto"
           >
             取消
           </button>
@@ -439,7 +439,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
         </div>
       </div>
 
-      
+
     </div>
   );
 }
@@ -455,12 +455,12 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-bold text-accent-inkMute mb-1.5">
+      <span className="block text-xs font-bold text-accent-inkMute dark:text-gray-400 mb-1.5 transition-colors">
         {label}
       </span>
       {children}
       {error && (
-        <div className="flex items-center gap-1 mt-1.5 text-xs text-red-500 bg-red-50 rounded-lg px-2 py-1.5">
+        <div className="flex items-center gap-1 mt-1.5 text-xs text-red-500 bg-red-50 dark:bg-red-500/20 rounded-lg px-2 py-1.5 transition-colors">
           <AlertCircle size={12} />
           <span>{error}</span>
         </div>

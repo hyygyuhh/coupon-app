@@ -9,14 +9,14 @@ interface Props {
 
 export default function BottomNavBar({ currentView, onHome, onAdd, onSettings }: Props) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-accent-grayLight/50 sm:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#2d2d44]/95 backdrop-blur-md border-t border-accent-grayLight/50 dark:border-white/10 sm:hidden transition-colors duration-300">
       <div className="flex items-center justify-around py-2">
         <button
           onClick={onHome}
           className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 ${
             currentView === "home"
               ? "text-accent-orange"
-              : "text-accent-inkMute hover:text-accent-orange"
+              : "text-accent-inkMute dark:text-gray-400 hover:text-accent-orange"
           }`}
         >
           <Home size={22} strokeWidth={currentView === "home" ? 2.5 : 2} />
@@ -35,7 +35,7 @@ export default function BottomNavBar({ currentView, onHome, onAdd, onSettings }:
           className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 ${
             currentView === "settings"
               ? "text-accent-orange"
-              : "text-accent-inkMute hover:text-accent-orange"
+              : "text-accent-inkMute dark:text-gray-400 hover:text-accent-orange"
           }`}
         >
           <Settings size={22} strokeWidth={currentView === "settings" ? 2.5 : 2} />

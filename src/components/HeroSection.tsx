@@ -16,19 +16,19 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
   return (
     <section className="relative overflow-hidden">
       {/* 背景光晕 */}
-      <div className="pointer-events-none absolute -top-20 -left-20 w-80 h-80 bg-accent-orangeLight/40 rounded-full blur-3xl" />
-      <div className="pointer-events-none absolute top-10 right-0 w-96 h-96 bg-accent-mintLight/40 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -top-20 -left-20 w-80 h-80 bg-accent-orangeLight/40 dark:bg-accent-orange/20 rounded-full blur-3xl transition-colors" />
+      <div className="pointer-events-none absolute top-10 right-0 w-96 h-96 bg-accent-mintLight/40 dark:bg-accent-mint/20 rounded-full blur-3xl transition-colors" />
 
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
           <div>
-            <p className="text-sm text-accent-inkMute mb-1">
+            <p className="text-sm text-accent-inkMute dark:text-gray-400 mb-1 transition-colors">
               Hi ~ 这里是你的
             </p>
-            <h2 className="font-display text-4xl sm:text-5xl font-extrabold text-accent-ink leading-tight">
+            <h2 className="font-display text-4xl sm:text-5xl font-extrabold text-accent-ink dark:text-white leading-tight transition-colors">
               羊毛 <span className="text-accent-orange">小仓库</span>
             </h2>
-            <p className="mt-2 text-sm text-accent-inkMute max-w-md">
+            <p className="mt-2 text-sm text-accent-inkMute dark:text-gray-400 max-w-md transition-colors">
               按过期时间自动排列，最紧急的券放在最前面，再也不错过薅羊毛机会 🐏
             </p>
           </div>
@@ -46,13 +46,13 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
         {total > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-floatUp">
             {/* 使用效率卡片 */}
-            <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50">
+            <div className="bg-white dark:bg-[#2d2d44] rounded-3xl p-5 shadow-card border border-accent-grayLight/50 dark:border-white/10 transition-colors duration-300">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-accent-mint/20 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-accent-mint/20 dark:bg-accent-mint/30 flex items-center justify-center">
                     <TrendingUp className="w-4 h-4 text-accent-mint" />
                   </div>
-                  <span className="font-bold text-accent-ink">使用效率</span>
+                  <span className="font-bold text-accent-ink dark:text-white transition-colors">使用效率</span>
                 </div>
                 <span className={`text-xl font-bold font-display ${
                   usageRate >= 50 ? "text-accent-mint" : usageRate >= 30 ? "text-accent-orange" : "text-accent-red"
@@ -60,7 +60,7 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
                   {usageRate}%
                 </span>
               </div>
-              <div className="h-2 bg-paper rounded-full overflow-hidden">
+              <div className="h-2 bg-paper dark:bg-[#252538] rounded-full overflow-hidden transition-colors">
                 <div
                   className={`h-full transition-all duration-500 ${
                     usageRate >= 50 ? "bg-accent-mint" : usageRate >= 30 ? "bg-accent-orange" : "bg-accent-red"
@@ -68,20 +68,20 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
                   style={{ width: `${usageRate}%` }}
                 />
               </div>
-              <div className="flex justify-between mt-2 text-xs text-accent-inkMute">
+              <div className="flex justify-between mt-2 text-xs text-accent-inkMute dark:text-gray-400 transition-colors">
                 <span>已使用 {used} 张</span>
                 <span>共 {total} 张</span>
               </div>
             </div>
 
             {/* 过期浪费卡片 */}
-            <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50">
+            <div className="bg-white dark:bg-[#2d2d44] rounded-3xl p-5 shadow-card border border-accent-grayLight/50 dark:border-white/10 transition-colors duration-300">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-accent-red/20 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-accent-red/20 dark:bg-accent-red/30 flex items-center justify-center">
                     <TrendingDown className="w-4 h-4 text-accent-red" />
                   </div>
-                  <span className="font-bold text-accent-ink">过期浪费</span>
+                  <span className="font-bold text-accent-ink dark:text-white transition-colors">过期浪费</span>
                 </div>
                 <span className={`text-xl font-bold font-display ${
                   wasteRate === 0 ? "text-accent-mint" : wasteRate <= 10 ? "text-accent-orange" : "text-accent-red"
@@ -89,7 +89,7 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
                   {wasteRate}%
                 </span>
               </div>
-              <div className="h-2 bg-paper rounded-full overflow-hidden">
+              <div className="h-2 bg-paper dark:bg-[#252538] rounded-full overflow-hidden transition-colors">
                 <div
                   className={`h-full transition-all duration-500 ${
                     wasteRate === 0 ? "bg-accent-mint" : wasteRate <= 10 ? "bg-accent-orange" : "bg-accent-red"
@@ -97,7 +97,7 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
                   style={{ width: `${wasteRate}%` }}
                 />
               </div>
-              <div className="flex justify-between mt-2 text-xs text-accent-inkMute">
+              <div className="flex justify-between mt-2 text-xs text-accent-inkMute dark:text-gray-400 transition-colors">
                 <span>已过期 {expired} 张</span>
                 <span>共 {total} 张</span>
               </div>
@@ -107,13 +107,13 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
 
         {/* 警告提示 */}
         {soon > 0 && (
-          <div className="mt-4 flex items-center gap-3 p-4 bg-accent-orange/10 rounded-2xl border border-accent-orange/30 animate-floatUp">
+          <div className="mt-4 flex items-center gap-3 p-4 bg-accent-orange/10 dark:bg-accent-orange/20 rounded-2xl border border-accent-orange/30 animate-floatUp transition-colors">
             <AlertCircle className="w-5 h-5 text-accent-orange flex-shrink-0" />
             <div className="flex-1">
               <p className="font-bold text-accent-orange text-sm">
                 注意！有 {soon} 张券即将过期
               </p>
-              <p className="text-xs text-accent-inkMute mt-0.5">
+              <p className="text-xs text-accent-inkMute dark:text-gray-400 mt-0.5 transition-colors">
                 请尽快使用这些优惠券，以免浪费
               </p>
             </div>
@@ -122,13 +122,13 @@ export default function HeroSection({ total, soon, unused, used, expired }: Prop
 
         {/* 空状态提示 */}
         {total === 0 && (
-          <div className="mt-4 flex items-center gap-3 p-4 bg-accent-mint/10 rounded-2xl border border-accent-mint/30 animate-floatUp">
+          <div className="mt-4 flex items-center gap-3 p-4 bg-accent-mint/10 dark:bg-accent-mint/20 rounded-2xl border border-accent-mint/30 animate-floatUp transition-colors">
             <Clock className="w-5 h-5 text-accent-mint flex-shrink-0" />
             <div className="flex-1">
               <p className="font-bold text-accent-mint text-sm">
                 暂无优惠券
               </p>
-              <p className="text-xs text-accent-inkMute mt-0.5">
+              <p className="text-xs text-accent-inkMute dark:text-gray-400 mt-0.5 transition-colors">
                 点击右上角「添加券」开始记录你的第一张优惠券吧
               </p>
             </div>

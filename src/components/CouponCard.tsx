@@ -32,12 +32,12 @@ export default function CouponCard({
   const [copied, setCopied] = useState(false);
 
   const borderColor = expired
-    ? "border-accent-red/40 bg-white"
+    ? "border-accent-red/40 dark:border-accent-red/30"
     : used
-    ? "border-accent-mintLight bg-white"
+    ? "border-accent-mintLight dark:border-accent-mint/30"
     : urgent
-    ? "border-2 border-accent-orange bg-white"
-    : "border border-accent-orangeLight/50 bg-white";
+    ? "border-2 border-accent-orange dark:border-accent-orange"
+    : "border border-accent-orangeLight/50 dark:border-white/10";
 
   const copyCode = () => {
     if (!coupon.code) return;
@@ -64,7 +64,7 @@ export default function CouponCard({
           className={`absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center transition z-10 ${
             selected
               ? "bg-accent-orange text-white"
-              : "bg-white/80 text-accent-ink border border-accent-orangeLight/50 hover:border-accent-orange"
+              : "bg-white/80 dark:bg-[#2d2d44]/80 text-accent-ink dark:text-white border border-accent-orangeLight/50 dark:border-white/20 hover:border-accent-orange"
           }`}
         >
           {selected ? <Check size={14} strokeWidth={3} /> : <Square size={14} />}
@@ -74,14 +74,14 @@ export default function CouponCard({
       <div className="flex items-stretch">
         {/* 左侧：金额 / 主色 */}
         <div
-          className={`w-28 sm:w-32 flex-shrink-0 flex flex-col justify-center items-center py-5 px-3 ${
+          className={`w-28 sm:w-32 flex-shrink-0 flex flex-col justify-center items-center py-5 px-3 transition-colors ${
             expired
-              ? "bg-accent-red/10 text-accent-red"
+              ? "bg-accent-red/10 dark:bg-accent-red/20 text-accent-red"
               : used
-              ? "bg-accent-mintLight/30 text-accent-mint"
+              ? "bg-accent-mintLight/30 dark:bg-accent-mint/20 text-accent-mint"
               : urgent
-              ? "bg-accent-orange/15 text-accent-orange"
-              : "bg-accent-orangeLight/20 text-accent-orange"
+              ? "bg-accent-orange/15 dark:bg-accent-orange/20 text-accent-orange"
+              : "bg-accent-orangeLight/20 dark:bg-accent-orange/15 text-accent-orange"
           }`}
         >
           <span className="text-[11px] uppercase tracking-wider opacity-70">
@@ -90,7 +90,7 @@ export default function CouponCard({
           <span className="font-display text-2xl sm:text-3xl font-extrabold leading-tight mt-1 text-center break-all">
             {coupon.amount || "券"}
           </span>
-          <div className="mt-2 text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/70">
+          <div className="mt-2 text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/70 dark:bg-white/20 transition-colors">
             {expired
               ? "已过期"
               : used
@@ -102,15 +102,15 @@ export default function CouponCard({
         </div>
 
         {/* 虚线分隔 */}
-        <div className="border-l-2 border-dashed border-accent-inkMute/20" />
+        <div className="border-l-2 border-dashed border-accent-inkMute/20 dark:border-white/10" />
 
         {/* 右侧：内容 */}
         <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between min-w-0 pr-10">
           <div>
-            <h3 className="font-display text-lg font-bold text-accent-ink truncate">
+            <h3 className="font-display text-lg font-bold text-accent-ink dark:text-white truncate transition-colors">
               {coupon.name}
             </h3>
-            <p className="text-xs text-accent-inkMute mt-1">
+            <p className="text-xs text-accent-inkMute dark:text-gray-400 mt-1 transition-colors">
               到期 {formatDate(coupon.expiryDate)}
             </p>
 
@@ -118,7 +118,7 @@ export default function CouponCard({
               <button
                 type="button"
                 onClick={copyCode}
-                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/30 px-2.5 py-1 rounded-lg transition"
+                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent-ink dark:text-white bg-paper dark:bg-[#252538] hover:bg-accent-orangeLight/30 dark:hover:bg-white/10 px-2.5 py-1 rounded-lg transition"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
                 <span className="tracking-wider">{coupon.code}</span>
@@ -131,7 +131,7 @@ export default function CouponCard({
                 {coupon.tags.map((t) => (
                   <span
                     key={t}
-                    className="text-[11px] bg-accent-mintLight/40 text-accent-mint px-2 py-0.5 rounded-full font-bold"
+                    className="text-[11px] bg-accent-mintLight/40 dark:bg-accent-mint/20 text-accent-mint px-2 py-0.5 rounded-full font-bold transition-colors"
                   >
                     #{t}
                   </span>
@@ -140,7 +140,7 @@ export default function CouponCard({
             )}
 
             {coupon.note && (
-              <p className="text-xs text-accent-inkMute mt-3 line-clamp-2">
+              <p className="text-xs text-accent-inkMute dark:text-gray-400 mt-3 line-clamp-2 transition-colors">
                 📝 {coupon.note}
               </p>
             )}
@@ -153,7 +153,7 @@ export default function CouponCard({
                 href={coupon.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-accent-ink bg-accent-mintLight/40 hover:bg-accent-mintLight px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto"
+                className="inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-accent-ink dark:text-white bg-accent-mintLight/40 dark:bg-accent-mint/20 hover:bg-accent-mintLight dark:hover:bg-accent-mint/30 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto"
               >
                 <ExternalLink className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> 去使用
               </a>
@@ -163,7 +163,7 @@ export default function CouponCard({
               onClick={() => onToggleUsed(coupon)}
               className={`inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto ${
                 used
-                  ? "bg-accent-inkMute/20 text-accent-ink hover:bg-accent-inkMute/30"
+                  ? "bg-accent-inkMute/20 dark:bg-white/10 text-accent-ink dark:text-white hover:bg-accent-inkMute/30 dark:hover:bg-white/20"
                   : "bg-accent-mint text-white hover:bg-accent-mint/90"
               }`}
             >
@@ -172,14 +172,14 @@ export default function CouponCard({
             <button
               type="button"
               onClick={() => onEdit(coupon)}
-              className="inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto"
+              className="inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-accent-ink dark:text-white bg-paper dark:bg-[#252538] hover:bg-accent-orangeLight/40 dark:hover:bg-white/10 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto"
             >
               <Edit3 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> 编辑
             </button>
             <button
               type="button"
               onClick={() => onDelete(coupon)}
-              className="inline-flex items-center justify-center w-11 h-11 sm:w-auto sm:h-auto text-xs sm:text-sm font-bold text-accent-red bg-accent-redLight/30 hover:bg-accent-redLight/60 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition"
+              className="inline-flex items-center justify-center w-11 h-11 sm:w-auto sm:h-auto text-xs sm:text-sm font-bold text-accent-red bg-accent-redLight/30 dark:bg-accent-red/20 hover:bg-accent-redLight/60 dark:hover:bg-accent-red/30 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition"
             >
               <Trash2 className="w-4.5 h-4.5 sm:w-3.5 sm:h-3.5" />
             </button>
