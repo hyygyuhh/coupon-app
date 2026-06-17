@@ -12,6 +12,9 @@ interface CouponState {
   markUnused: (id: string) => void;
   removeCoupon: (id: string) => void;
   refreshExpired: () => void;
+  batchDelete: (ids: string[]) => void;
+  batchMarkUsed: (ids: string[]) => void;
+  batchAddTag: (ids: string[], tag: string) => void;
 }
 
 function nowISO() {
@@ -141,6 +144,31 @@ export const useCouponStore = create<CouponState>((set, get) => {
         saveCoupons(next);
         set({ coupons: next });
       }
+    },
+
+    batchDelete: (ids) => {
+      const next = get().coupons.filter((c) => !ids.includes(c.id));
+      saveCoupons(next);
+      set({ coupons: next });
+    },
+
+    batchMarkUsed: (ids) => {
+      const next = get().coupons.map((c) =>
+        ids.includes(c.id) ? { ...c, status: "used" as const, updatedAt: nowISO() } : c
+      );
+      saveCoupons(next);
+      set({ coupons: next });
+    },
+
+    batchAddTag: (ids, tag) => {
+      const next = get().coupons.map((c) => {
+        if (!ids.includes(c.id)) return c;
+        const tags = c.tags || [];
+        if (tags.includes(tag)) return c;
+        return { ...c, tags: [...tags, tag], updatedAt: nowISO() };
+      });
+      saveCoupons(next);
+      set({ coupons: next });
     },
   };
 });

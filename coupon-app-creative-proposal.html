@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>羊毛管家 - 创意方案</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafbfc;
+      --text: #1a1a2e;
+      --text-secondary: #6b7280;
+      --accent: #f59e0b;
+      --accent-light: #fef3c7;
+      --purple: #8b5cf6;
+      --purple-light: #ede9fe;
+      --blue: #3b82f6;
+      --blue-light: #dbeafe;
+      --green: #10b981;
+      --green-light: #d1fae5;
+      --red: #ef4444;
+      --red-light: #fee2e2;
+      --card: #ffffff;
+      --shadow: 0 4px 24px rgba(0,0,0,0.06);
+      --shadow-lg: 0 12px 48px rgba(0,0,0,0.1);
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    body {
+      font-family: 'Noto Sans SC', 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(250, 251, 252, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 20px;
+    }
+    
+    .nav-logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    
+    .nav-links {
+      display: flex;
+      gap: 32px;
+    }
+    
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    
+    .nav-links a:hover {
+      color: var(--text);
+    }
+    
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 120px 40px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.08) 0%, transparent 60%);
+    }
+    
+    .hero-content {
+      max-width: 900px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--accent-light);
+      border-radius: 50px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #92400e;
+      margin-bottom: 32px;
+      animation: fadeInUp 0.6s ease-out;
+    }
+    
+    .hero-badge span {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+    
+    .hero h1 {
+      font-size: clamp(48px, 8vw, 80px);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      animation: fadeInUp 0.6s ease-out 0.1s both;
+    }
+    
+    .hero h1 .highlight {
+      background: linear-gradient(135deg, #f59e0b, #ea580c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero-subtitle {
+      font-size: clamp(18px, 2.5vw, 22px);
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 48px;
+      animation: fadeInUp 0.6s ease-out 0.2s both;
+    }
+    
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: fadeInUp 0.6s ease-out 0.3s both;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+    
+    .btn-primary {
+      background: var(--text);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    }
+    
+    .btn-secondary {
+      background: white;
+      color: var(--text);
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--bg);
+    }
+    
+    .hero-image {
+      margin-top: 80px;
+      animation: fadeInUp 0.8s ease-out 0.4s both;
+    }
+    
+    .hero-image img {
+      width: 100%;
+      max-width: 1000px;
+      border-radius: 24px;
+      box-shadow: var(--shadow-lg);
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* Section */
+    section {
+      padding: 100px 40px;
+    }
+    
+    .section-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 64px;
+    }
+    
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+    
+    .section-title {
+      font-size: clamp(32px, 4vw, 42px);
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 18px;
+    }
+    
+    /* Problem */
+    .problem {
+      background: var(--text);
+      color: white;
+    }
+    
+    .problem .section-label {
+      color: var(--accent);
+    }
+    
+    .problem .section-title {
+      color: white;
+    }
+    
+    .problem .section-desc {
+      color: rgba(255,255,255,0.7);
+    }
+    
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .problem-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 32px;
+      transition: all 0.3s;
+    }
+    
+    .problem-card:hover {
+      background: rgba(255,255,255,0.1);
+      transform: translateY(-4px);
+    }
+    
+    .problem-icon {
+      width: 56px;
+      height: 56px;
+      background: rgba(245, 158, 11, 0.2);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+    
+    .problem-card h3 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    
+    .problem-card p {
+      color: rgba(255,255,255,0.7);
+      font-size: 15px;
+    }
+    
+    /* Features */
+    .features {
+      background: white;
+    }
+    
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .feature-card {
+      padding: 40px;
+      border-radius: 24px;
+      background: var(--bg);
+      border: 1px solid rgba(0,0,0,0.05);
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+    
+    .feature-card:nth-child(1)::before { background: linear-gradient(90deg, #f59e0b, #ea580c); }
+    .feature-card:nth-child(2)::before { background: linear-gradient(90deg, #8b5cf6, #a855f7); }
+    .feature-card:nth-child(3)::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .feature-card:nth-child(4)::before { background: linear-gradient(90deg, #10b981, #34d399); }
+    
+    .feature-card:hover {
+      transform: translateY(-8px);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .feature-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 24px;
+    }
+    
+    .feature-card:nth-child(1) .feature-icon { background: var(--accent-light); }
+    .feature-card:nth-child(2) .feature-icon { background: var(--purple-light); }
+    .feature-card:nth-child(3) .feature-icon { background: var(--blue-light); }
+    .feature-card:nth-child(4) .feature-icon { background: var(--green-light); }
+    
+    .feature-card h3 {
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    
+    .feature-card p {
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    
+    .feature-tag {
+      display: inline-block;
+      padding: 6px 12px;
+      background: var(--accent-light);
+      color: #92400e;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 16px;
+    }
+    
+    /* Tech */
+    .tech {
+      background: linear-gradient(180deg, var(--bg) 0%, white 100%);
+    }
+    
+    .tech-stack {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .tech-category {
+      margin-bottom: 48px;
+    }
+    
+    .tech-category h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: var(--text-secondary);
+    }
+    
+    .tech-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    
+    .tech-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      background: white;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    
+    .tech-item:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
+    }
+    
+    .tech-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    
+    /* Value */
+    .value {
+      background: white;
+    }
+    
+    .value-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .value-card {
+      padding: 40px;
+      border-radius: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .value-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      opacity: 0.05;
+      background-size: cover;
+      background-position: center;
+    }
+    
+    .value-card:nth-child(1) {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+    }
+    
+    .value-card:nth-child(1)::before {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='%23f59e0b'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E");
+    }
+    
+    .value-card:nth-child(2) {
+      background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    }
+    
+    .value-card:nth-child(2)::before {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='%233b82f6'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z'/%3E%3C/svg%3E");
+    }
+    
+    .value-card:nth-child(3) {
+      background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    }
+    
+    .value-card:nth-child(3)::before {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='%2310b981'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/%3E%3C/svg%3E");
+    }
+    
+    .value-number {
+      font-size: 56px;
+      font-weight: 800;
+      color: var(--text);
+      opacity: 0.15;
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+    
+    .value-card h3 {
+      font-size: 24px;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    
+    .value-card p {
+      color: var(--text-secondary);
+      font-size: 15px;
+      position: relative;
+      line-height: 1.7;
+    }
+    
+    /* CTA */
+    .cta {
+      background: var(--text);
+      color: white;
+      text-align: center;
+    }
+    
+    .cta .section-title {
+      color: white;
+    }
+    
+    .cta .section-desc {
+      color: rgba(255,255,255,0.7);
+    }
+    
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 40px;
+    }
+    
+    .cta .btn-primary {
+      background: var(--accent);
+      color: var(--text);
+    }
+    
+    .cta .btn-primary:hover {
+      background: #fbbf24;
+    }
+    
+    /* Footer */
+    footer {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    footer a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      nav {
+        padding: 12px 20px;
+      }
+      
+      .nav-links {
+        display: none;
+      }
+      
+      section {
+        padding: 60px 20px;
+      }
+      
+      .hero {
+        padding: 100px 20px 60px;
+      }
+      
+      .hero-cta {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .btn {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+      }
+    }
+    
+    /* Scroll animations */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav>
+    <div class="nav-logo">
+      <div class="nav-logo-icon">🐑</div>
+      <span>羊毛管家</span>
+    </div>
+    <div class="nav-links">
+      <a href="#problem">痛点</a>
+      <a href="#features">功能</a>
+      <a href="#tech">技术</a>
+      <a href="#value">价值</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span></span>
+        创意方案展示 · Trae AI 驱动
+      </div>
+      <h1>
+        羊毛管家<br>
+        <span class="highlight">优惠券智能管理</span>
+      </h1>
+      <p class="hero-subtitle">
+        用 AI 拍照识别优惠券，自动过期提醒，云端同步永不丢失
+      </p>
+      <div class="hero-cta">
+        <a href="https://hyygyuhh.github.io/coupon-app/" class="btn btn-primary" target="_blank">
+          🚀 在线体验
+        </a>
+        <a href="https://github.com/hyygyuhh/coupon-app" class="btn btn-secondary" target="_blank">
+          📂 源码下载
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="problem" id="problem">
+    <div class="section-header reveal">
+      <div class="section-label">痛点分析</div>
+      <h2 class="section-title">优惠券管理，你中招了吗？</h2>
+      <p class="section-desc">我们都在被这些琐碎却重要的事情消耗着</p>
+    </div>
+    
+    <div class="problem-grid">
+      <div class="problem-card reveal">
+        <div class="problem-icon">😔</div>
+        <h3>过期了才知道</h3>
+        <p>满减券、兑换券堆满抽屉，等想起来时已经过期，白白错过优惠</p>
+      </div>
+      <div class="problem-card reveal">
+        <div class="problem-icon">🤷</div>
+        <h3>纸质券易丢失</h3>
+        <p>超市小票、门店传单、积分兑换券... 整理起来头疼，丢一张就亏一笔</p>
+      </div>
+      <div class="problem-card reveal">
+        <div class="problem-icon">📱</div>
+        <h3>平台提醒太分散</h3>
+        <p>各平台优惠券分散在不同 App，推送容易被忽略，根本记不住</p>
+      </div>
+      <div class="problem-card reveal">
+        <div class="problem-icon">😓</div>
+        <h3>手动录入太麻烦</h3>
+        <p>想把优惠券记下来，但输入名称、有效期、金额... 太繁琐，懒得弄</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <div class="section-header reveal">
+      <div class="section-label">核心功能</div>
+      <h2 class="section-title">一拍即存，智能提醒</h2>
+      <p class="section-desc">简单四步，告别优惠券焦虑</p>
+    </div>
+    
+    <div class="feature-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">📷</div>
+        <h3>AI 拍照识别</h3>
+        <p>拍照即识别，自动提取优惠券名称、平台、金额和有效期。内置 OCR 引擎支持中英文，无需上传云端，保护隐私。</p>
+        <span class="feature-tag">本地处理 · 隐私安全</span>
+      </div>
+      
+      <div class="feature-card reveal">
+        <div class="feature-icon">🔔</div>
+        <h3>智能过期提醒</h3>
+        <p>支持钉钉、飞书双渠道提醒。自定义提前提醒天数，在过期前自动通知，不遗漏任何一张券。</p>
+        <span class="feature-tag">多平台推送 · 可自定义</span>
+      </div>
+      
+      <div class="feature-card reveal">
+        <div class="feature-icon">☁️</div>
+        <h3>自动云端同步</h3>
+        <p>数据自动同步到你的 GitHub Gist，云端备份防丢失。更换设备也能无缝继续使用。</p>
+        <span class="feature-tag">GitHub Gist · 零成本</span>
+      </div>
+      
+      <div class="feature-card reveal">
+        <div class="feature-icon">⚡</div>
+        <h3>每日自动检查</h3>
+        <p>基于 GitHub Actions 实现每日自动检查。即使不打开网站，到期前也会收到提醒。</p>
+        <span class="feature-tag">24/7 自动运维</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech -->
+  <section class="tech" id="tech">
+    <div class="section-header reveal">
+      <div class="section-label">技术架构</div>
+      <h2 class="section-title">纯前端 · 零成本 · 易扩展</h2>
+      <p class="section-desc">现代化的技术栈，带来流畅的用户体验</p>
+    </div>
+    
+    <div class="tech-stack reveal">
+      <div class="tech-category">
+        <h3>前端框架</h3>
+        <div class="tech-items">
+          <div class="tech-item"><span class="tech-icon">⚛️</span> React 18</div>
+          <div class="tech-item"><span class="tech-icon">🔷</span> TypeScript</div>
+          <div class="tech-item"><span class="tech-icon">⚡</span> Vite</div>
+          <div class="tech-item"><span class="tech-icon">📦</span> Zustand</div>
+        </div>
+      </div>
+      
+      <div class="tech-category">
+        <h3>核心能力</h3>
+        <div class="tech-items">
+          <div class="tech-item"><span class="tech-icon">👁️</span> Tesseract.js v5</div>
+          <div class="tech-item"><span class="tech-icon">🎨</span> Canvas API</div>
+          <div class="tech-item"><span class="tech-icon">📱</span> PWA</div>
+        </div>
+      </div>
+      
+      <div class="tech-category">
+        <h3>云端服务</h3>
+        <div class="tech-items">
+          <div class="tech-item"><span class="tech-icon">🚀</span> GitHub Pages</div>
+          <div class="tech-item"><span class="tech-icon">⚙️</span> GitHub Actions</div>
+          <div class="tech-item"><span class="tech-icon">💾</span> GitHub Gist</div>
+          <div class="tech-item"><span class="tech-icon">🔒</span> Webhook API</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Value -->
+  <section class="value" id="value">
+    <div class="section-header reveal">
+      <div class="section-label">价值主张</div>
+      <h2 class="section-title">为什么选择羊毛管家？</h2>
+      <p class="section-desc">从效率、体验、社会三个维度创造价值</p>
+    </div>
+    
+    <div class="value-grid">
+      <div class="value-card reveal">
+        <div class="value-number">01</div>
+        <h3>效率提升</h3>
+        <p>OCR 拍照识别代替手动录入，节省 90% 的记录时间。统一管理所有平台的优惠券，一目了然。</p>
+      </div>
+      
+      <div class="value-card reveal">
+        <div class="value-number">02</div>
+        <h3>零成本运维</h3>
+        <p>部署在 GitHub Pages，无服务器费用。GitHub Gist 存储数据，无数据库成本。GitHub Actions 自动运行，无运维负担。</p>
+      </div>
+      
+      <div class="value-card reveal">
+        <div class="value-number">03</div>
+        <h3>隐私保护</h3>
+        <p>所有数据存储在你自己的 GitHub Gist 中。OCR 处理在本地浏览器完成，敏感信息不经过任何第三方服务器。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="section-header reveal">
+      <div class="section-label">立即体验</div>
+      <h2 class="section-title">开始管理你的优惠券</h2>
+      <p class="section-desc">完全免费，开源项目，欢迎 Star 和 Fork</p>
+    </div>
+    
+    <div class="cta-buttons reveal">
+      <a href="https://hyygyuhh.github.io/coupon-app/" class="btn btn-primary" target="_blank">
+        🚀 打开应用
+      </a>
+      <a href="https://github.com/hyygyuhh/coupon-app" class="btn btn-secondary" target="_blank">
+        ⭐ GitHub
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>羊毛管家 · 用 <a href="https://trae.ai" target="_blank">Trae AI</a> 构建</p>
+    <p style="margin-top: 8px;">MIT License · 开源可商用</p>
+  </footer>
+
+  <script>
+    // Scroll reveal animation
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px',
+      }
+    );
+
+    document.querySelectorAll('.reveal').forEach((el) => {
+      observer.observe(el);
+    });
+
+    // Smooth scroll for nav links
+    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

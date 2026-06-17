@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>羊毛管家 - 优惠券智能管理助手</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .logo {
+      width: 120px;
+      height: 120px;
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      border-radius: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .logo svg {
+      width: 80px;
+      height: 80px;
+    }
+    
+    h1 {
+      color: white;
+      font-size: 42px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    
+    .subtitle {
+      color: rgba(255,255,255,0.9);
+      font-size: 20px;
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    
+    .feature {
+      background: white;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    
+    .feature:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    
+    .feature-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      font-size: 28px;
+    }
+    
+    .feature-icon.ocr { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .feature-icon.reminder { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .feature-icon.sync { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    .feature-icon.cloud { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+    
+    .feature h3 {
+      font-size: 20px;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+    }
+    
+    .feature p {
+      color: #666;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    
+    .stats {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    }
+    
+    .stats h2 {
+      color: #1a1a2e;
+      font-size: 24px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    
+    @media (max-width: 600px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .stat-label {
+      color: #666;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    
+    .tech {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    }
+    
+    .tech h2 {
+      color: #1a1a2e;
+      font-size: 24px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    
+    .tech-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+    
+    .tech-tag {
+      background: linear-gradient(135deg, #667eea22, #764ba222);
+      color: #667eea;
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid #667eea44;
+    }
+    
+    .footer {
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      font-size: 14px;
+    }
+    
+    .footer a {
+      color: white;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <svg viewBox="0 0 80 80" fill="none">
+          <circle cx="40" cy="40" r="36" fill="url(#grad1)" />
+          <text x="40" y="50" text-anchor="middle" font-size="32" font-weight="bold" fill="white">羊</text>
+          <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#FFD700"/>
+              <stop offset="100%" style="stop-color:#FFA500"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h1>羊毛管家</h1>
+      <p class="subtitle">优惠券智能管理助手 - 让每一分优惠都不被错过</p>
+    </div>
+    
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon ocr">📷</div>
+        <h3>AI 拍照识别</h3>
+        <p>采用 Tesseract.js 引擎，智能识别优惠券信息，自动提取名称、平台、金额和有效期，省去手动输入的繁琐。</p>
+      </div>
+      
+      <div class="feature">
+        <div class="feature-icon reminder">🔔</div>
+        <h3>过期提醒</h3>
+        <p>支持钉钉、飞书双渠道提醒，自定义提前提醒天数，确保你在优惠券过期前及时使用，不浪费任何权益。</p>
+      </div>
+      
+      <div class="feature">
+        <div class="feature-icon sync">🔄</div>
+        <h3>自动同步</h3>
+        <p>本地数据自动同步到 GitHub Gist，云端备份防丢失，随时随地访问你的优惠券收藏。</p>
+      </div>
+      
+      <div class="feature">
+        <div class="feature-icon cloud">☁️</div>
+        <h3>自动提醒</h3>
+        <p>基于 GitHub Actions 实现每日自动检查，即使不打开网站也能收到过期提醒。</p>
+      </div>
+    </div>
+    
+    <div class="stats">
+      <h2>技术亮点</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">100%</div>
+          <div class="stat-label">纯前端实现</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">0</div>
+          <div class="stat-label">服务器费用</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">24h</div>
+          <div class="stat-label">自动运维</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">∞</div>
+          <div class="stat-label">云端存储</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="tech">
+      <h2>技术栈</h2>
+      <div class="tech-tags">
+        <span class="tech-tag">React 18</span>
+        <span class="tech-tag">TypeScript</span>
+        <span class="tech-tag">Vite</span>
+        <span class="tech-tag">Tesseract.js</span>
+        <span class="tech-tag">Zustand</span>
+        <span class="tech-tag">GitHub Actions</span>
+        <span class="tech-tag">GitHub Pages</span>
+        <span class="tech-tag">Gist API</span>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>开源地址：<a href="https://github.com/hyygyuhh/coupon-app">github.com/hyygyuhh/coupon-app</a></p>
+      <p style="margin-top: 8px;">Powered by Trae AI</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,14 +1,19 @@
-import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Filter, TrendingUp } from "lucide-react";
 import type { Coupon, CouponStatus } from "../types/coupon";
 import { daysUntil } from "../utils/date";
 import CouponCard from "./CouponCard";
+import BatchActions from "./BatchActions";
+import { showToast } from "./Toast";
 
 interface Props {
   coupons: Coupon[];
   onEdit: (c: Coupon) => void;
   onToggleUsed: (c: Coupon) => void;
   onDelete: (c: Coupon) => void;
+  onBatchDelete: (ids: string[]) => void;
+  onBatchMarkUsed: (ids: string[]) => void;
+  onBatchAddTag: (ids: string[], tag: string) => void;
 }
 
 type Filter = "all" | CouponStatus | "soon";
@@ -36,9 +41,13 @@ export default function CouponList({
   onEdit,
   onToggleUsed,
   onDelete,
+  onBatchDelete,
+  onBatchMarkUsed,
+  onBatchAddTag,
 }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [keyword, setKeyword] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const filtered = useMemo(() => {
     let list = coupons;
@@ -62,7 +71,6 @@ export default function CouponList({
           (c.tags || []).some((t) => t.toLowerCase().includes(k))
       );
     }
-    // 排序：未使用按过期升序，已使用按更新时间降序，已过期按过期日期降序
     return [...list].sort((a, b) => {
       const weight = (c: Coupon) =>
         c.status === "unused" ? 0 : c.status === "used" ? 1 : 2;
@@ -75,6 +83,50 @@ export default function CouponList({
       );
     });
   }, [coupons, filter, keyword]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const selectAll = () => {
+    if (selectedIds.length === filtered.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map((c) => c.id));
+    }
+  };
+
+  const handleBatchDelete = () => {
+    onBatchDelete(selectedIds);
+    setSelectedIds([]);
+    showToast("success", `已删除 ${selectedIds.length} 张券`);
+  };
+
+  const handleBatchMarkUsed = () => {
+    onBatchMarkUsed(selectedIds);
+    setSelectedIds([]);
+    showToast("success", `已标记 ${selectedIds.length} 张券为已使用`);
+  };
+
+  const handleBatchAddTag = (tag: string) => {
+    onBatchAddTag(selectedIds, tag);
+    showToast("success", `已为 ${selectedIds.length} 张券添加标签「${tag}」`);
+  };
+
+  const groupedByPlatform = useMemo(() => {
+    if (filter === "all") {
+      const groups: Record<string, Coupon[]> = {};
+      filtered.forEach((c) => {
+        const key = c.platform || "未分类";
+        groups[key] = groups[key] || [];
+        groups[key].push(c);
+      });
+      return groups;
+    }
+    return { 全部: filtered };
+  }, [filtered, filter]);
 
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
@@ -108,6 +160,20 @@ export default function CouponList({
         </div>
       </div>
 
+      {/* 批量操作 */}
+      {filtered.length > 0 && (
+        <BatchActions
+          coupons={filtered}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onSelectAll={selectAll}
+          onClearSelection={() => setSelectedIds([])}
+          onBatchDelete={handleBatchDelete}
+          onBatchMarkUsed={handleBatchMarkUsed}
+          onBatchAddTag={handleBatchAddTag}
+        />
+      )}
+
       {/* 卡片网格 */}
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-accent-inkMute animate-floatUp">
@@ -115,15 +181,29 @@ export default function CouponList({
           这里空空的，换个筛选条件看看？
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((c) => (
-            <CouponCard
-              key={c.id}
-              coupon={c}
-              onEdit={onEdit}
-              onToggleUsed={onToggleUsed}
-              onDelete={onDelete}
-            />
+        <div className="space-y-6">
+          {Object.entries(groupedByPlatform).map(([platform, items]) => (
+            <div key={platform}>
+              <div className="flex items-center gap-2 mb-3">
+                <Filter size={14} className="text-accent-inkMute" />
+                <span className="text-sm font-medium text-accent-inkMute">
+                  {platform} ({items.length})
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {items.map((c) => (
+                  <CouponCard
+                    key={c.id}
+                    coupon={c}
+                    onEdit={onEdit}
+                    onToggleUsed={onToggleUsed}
+                    onDelete={onDelete}
+                    selected={selectedIds.includes(c.id)}
+                    onSelect={() => toggleSelect(c.id)}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

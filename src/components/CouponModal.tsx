@@ -425,14 +425,14 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-full font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 transition"
+            className="px-6 py-3 sm:px-5 sm:py-2 rounded-full font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 transition min-h-[48px] sm:min-h-auto"
           >
             取消
           </button>
           <button
             type="button"
             onClick={submit}
-            className="px-5 py-2 rounded-full font-bold text-white bg-accent-orange hover:bg-accent-orange/90 shadow-card transition active:scale-95"
+            className="px-6 py-3 sm:px-5 sm:py-2 rounded-full font-bold text-white bg-accent-orange hover:bg-accent-orange/90 shadow-card transition active:scale-95 min-h-[48px] sm:min-h-auto"
           >
             {coupon ? "保存修改" : "添加券"}
           </button>

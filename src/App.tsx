@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import NavBar from "./components/NavBar";
+import BottomNavBar from "./components/BottomNavBar";
 import HeroSection from "./components/HeroSection";
 import CouponList from "./components/CouponList";
 import EmptyState from "./components/EmptyState";
 import CouponModal from "./components/CouponModal";
 import ReminderSettings from "./components/ReminderSettings";
+import ToastContainer from "./components/Toast";
 import { useCouponStore } from "./store/couponStore";
 import type { Coupon, CouponInput } from "./types/coupon";
 import { daysUntil } from "./utils/date";
@@ -12,6 +14,7 @@ import { preloadOCR } from "./utils/ocrService";
 import { sendReminderIfNeeded } from "./utils/reminder";
 import { syncToCloud } from "./utils/cloudSync";
 import { REMINDER_DELAY_MS, EXPIRED_REFRESH_INTERVAL_MS, OCR_PRELOAD_DELAY_MS, SYNC_DELAY_MS } from "./utils/constants";
+import { showToast } from "./components/Toast";
 
 type View = "home" | "settings";
 
@@ -24,6 +27,9 @@ export default function App() {
     markUnused,
     removeCoupon,
     refreshExpired,
+    batchDelete,
+    batchMarkUsed,
+    batchAddTag,
   } = useCouponStore();
 
   const [view, setView] = useState<View>("home");
@@ -52,12 +58,14 @@ export default function App() {
 
   useEffect(() => {
     const timer = setTimeout(async () => {
-      await sendReminderIfNeeded(coupons);
+      const success = await sendReminderIfNeeded(coupons);
+      if (success) {
+        showToast("success", "已发送过期提醒");
+      }
     }, REMINDER_DELAY_MS);
     return () => clearTimeout(timer);
   }, [coupons]);
 
-  // 自动同步到云端
   useEffect(() => {
     const timer = setTimeout(() => {
       syncToCloud(coupons).catch(console.error);
@@ -106,10 +114,16 @@ export default function App() {
     else addCoupon(input);
     setModalOpen(false);
     setEditing(null);
+    showToast("success", id ? "已更新优惠券" : "已添加优惠券");
   };
   const toggleUsed = (c: Coupon) => {
-    if (c.status === "used") markUnused(c.id);
-    else markUsed(c.id);
+    if (c.status === "used") {
+      markUnused(c.id);
+      showToast("success", "已标记为未使用");
+    } else {
+      markUsed(c.id);
+      showToast("success", "已标记为已使用");
+    }
   };
   const onDelete = (c: Coupon) => {
     setPendingDelete(c);
@@ -117,6 +131,7 @@ export default function App() {
   const confirmDelete = () => {
     if (pendingDelete) {
       removeCoupon(pendingDelete.id);
+      showToast("success", "已删除优惠券");
       setPendingDelete(null);
     }
   };
@@ -126,7 +141,7 @@ export default function App() {
 
   if (view === "settings") {
     return (
-      <div className="min-h-screen text-accent-ink">
+      <div className="min-h-screen text-accent-ink pb-20">
         <NavBar 
           onAdd={openAdd} 
           onSettings={() => setView("home")}
@@ -134,15 +149,22 @@ export default function App() {
           isHome={false}
         />
         <ReminderSettings />
+        <ToastContainer />
         <footer className="text-center pb-8 text-xs text-accent-inkMute">
           🐑 羊毛管家 · 数据保存在你的浏览器本地
         </footer>
+        <BottomNavBar 
+          currentView="settings" 
+          onHome={() => setView("home")}
+          onAdd={openAdd}
+          onSettings={() => setView("settings")}
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen text-accent-ink">
+    <div className="min-h-screen text-accent-ink pb-20">
       <NavBar 
         onAdd={openAdd} 
         onSettings={() => setView("settings")}
@@ -166,6 +188,9 @@ export default function App() {
           onEdit={openEdit}
           onToggleUsed={toggleUsed}
           onDelete={onDelete}
+          onBatchDelete={batchDelete}
+          onBatchMarkUsed={batchMarkUsed}
+          onBatchAddTag={batchAddTag}
         />
       )}
       <CouponModal
@@ -211,9 +236,17 @@ export default function App() {
         </div>
       )}
 
+      <ToastContainer />
+
       <footer className="text-center pb-8 text-xs text-accent-inkMute">
         🐑 羊毛管家 · 数据保存在你的浏览器本地
       </footer>
+      <BottomNavBar 
+        currentView="home" 
+        onHome={() => setView("home")}
+        onAdd={openAdd}
+        onSettings={() => setView("settings")}
+      />
     </div>
   );
 }

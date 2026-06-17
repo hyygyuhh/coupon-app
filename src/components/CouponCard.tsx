@@ -1,4 +1,4 @@
-import { Check, Copy, Edit3, ExternalLink, Trash2 } from "lucide-react";
+import { Check, Copy, Edit3, ExternalLink, Trash2, Square } from "lucide-react";
 import { useState } from "react";
 import type { Coupon } from "../types/coupon";
 import {
@@ -13,6 +13,8 @@ interface Props {
   onEdit: (c: Coupon) => void;
   onToggleUsed: (c: Coupon) => void;
   onDelete: (c: Coupon) => void;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
 export default function CouponCard({
@@ -20,6 +22,8 @@ export default function CouponCard({
   onEdit,
   onToggleUsed,
   onDelete,
+  selected = false,
+  onSelect,
 }: Props) {
   const days = daysUntil(coupon.expiryDate);
   const urgent = coupon.status === "unused" && isSoon(coupon.expiryDate);
@@ -44,9 +48,29 @@ export default function CouponCard({
 
   return (
     <div
-      className={`coupon-card ${borderColor} shadow-card hover:shadow-cardHover transition-all duration-300 hover:-translate-y-1 animate-floatUp`}
+      className={`coupon-card ${borderColor} shadow-card hover:shadow-cardHover transition-all duration-300 hover:-translate-y-1 animate-floatUp ${
+        selected ? "ring-2 ring-accent-orange" : ""
+      }`}
       style={{ position: "relative" }}
     >
+      {/* 选择复选框 */}
+      {onSelect && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          className={`absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center transition z-10 ${
+            selected
+              ? "bg-accent-orange text-white"
+              : "bg-white/80 text-accent-ink border border-accent-orangeLight/50 hover:border-accent-orange"
+          }`}
+        >
+          {selected ? <Check size={14} strokeWidth={3} /> : <Square size={14} />}
+        </button>
+      )}
+
       <div className="flex items-stretch">
         {/* 左侧：金额 / 主色 */}
         <div
@@ -81,7 +105,7 @@ export default function CouponCard({
         <div className="border-l-2 border-dashed border-accent-inkMute/20" />
 
         {/* 右侧：内容 */}
-        <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between min-w-0">
+        <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between min-w-0 pr-10">
           <div>
             <h3 className="font-display text-lg font-bold text-accent-ink truncate">
               {coupon.name}
@@ -129,35 +153,35 @@ export default function CouponCard({
                 href={coupon.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-bold text-accent-ink bg-accent-mintLight/40 hover:bg-accent-mintLight px-2.5 py-1.5 rounded-lg transition"
+                className="inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-accent-ink bg-accent-mintLight/40 hover:bg-accent-mintLight px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto"
               >
-                <ExternalLink size={14} /> 去使用
+                <ExternalLink className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> 去使用
               </a>
             )}
             <button
               type="button"
               onClick={() => onToggleUsed(coupon)}
-              className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition ${
+              className={`inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto ${
                 used
                   ? "bg-accent-inkMute/20 text-accent-ink hover:bg-accent-inkMute/30"
                   : "bg-accent-mint text-white hover:bg-accent-mint/90"
               }`}
             >
-              <Check size={14} /> {used ? "取消已用" : "标记已用"}
+              <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> {used ? "取消已用" : "标记已用"}
             </button>
             <button
               type="button"
               onClick={() => onEdit(coupon)}
-              className="inline-flex items-center gap-1 text-xs font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 px-2.5 py-1.5 rounded-lg transition"
+              className="inline-flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-accent-ink bg-paper hover:bg-accent-orangeLight/40 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition min-h-[44px] sm:min-h-auto"
             >
-              <Edit3 size={14} /> 编辑
+              <Edit3 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> 编辑
             </button>
             <button
               type="button"
               onClick={() => onDelete(coupon)}
-              className="inline-flex items-center gap-1 text-xs font-bold text-accent-red bg-accent-redLight/30 hover:bg-accent-redLight/60 px-2.5 py-1.5 rounded-lg transition ml-auto"
+              className="inline-flex items-center justify-center w-11 h-11 sm:w-auto sm:h-auto text-xs sm:text-sm font-bold text-accent-red bg-accent-redLight/30 hover:bg-accent-redLight/60 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-lg transition"
             >
-              <Trash2 size={14} />
+              <Trash2 className="w-4.5 h-4.5 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
         </div>

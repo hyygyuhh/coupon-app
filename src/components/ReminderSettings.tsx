@@ -20,7 +20,7 @@ import {
   type CloudSyncConfig,
 } from "../utils/cloudSync";
 import { useCouponStore } from "../store/couponStore";
-import { exportAndDownload } from "../utils/export";
+import { exportAndDownload, importFromFile, type ImportResult } from "../utils/export";
 
 function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
@@ -60,6 +60,11 @@ export default function ReminderSettings() {
   const [testingReminder, setTestingReminder] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [theme, setTheme] = useState<ThemeType>(() => getTheme());
+  
+  // 数据导入状态
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<"success" | "error" | null>(null);
+  const [importError, setImportError] = useState("");
   
   // 云同步状态
   const [syncConfig, setSyncConfig] = useState<CloudSyncConfig>(() => getSyncConfig());
@@ -186,6 +191,34 @@ export default function ReminderSettings() {
     }
     setSyncing(false);
   }, [setCoupons]);
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    setImporting(true);
+    setImportResult(null);
+    setImportError("");
+    
+    const result = await importFromFile(file);
+    
+    if (result.success && result.coupons) {
+      const existingIds = new Set(coupons.map(c => c.id));
+      const newCoupons = result.coupons.filter(c => !existingIds.has(c.id));
+      const updatedCoupons = [...coupons, ...newCoupons];
+      setCoupons(updatedCoupons);
+      setImportResult("success");
+      if (newCoupons.length !== result.coupons.length) {
+        setImportError(`跳过 ${result.coupons.length - newCoupons.length} 条重复数据`);
+      }
+    } else {
+      setImportResult("error");
+      setImportError(result.error || "导入失败");
+    }
+    
+    setImporting(false);
+    event.target.value = "";
+  };
 
   const handleTest = async () => {
     if (!config.webhook) {
@@ -791,14 +824,15 @@ export default function ReminderSettings() {
         </div>
       </div>
 
-      {/* 数据导出 */}
+      {/* 数据备份与导入 */}
       <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
         <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
           <Download className="w-5 h-5 text-accent-orange" />
-          数据备份
+          数据备份与导入
         </h3>
-        <p className="text-sm text-accent-inkMute mb-4">导出优惠券数据，便于备份或迁移</p>
-        <div className="flex flex-wrap gap-3">
+        <p className="text-sm text-accent-inkMute mb-4">导出或导入优惠券数据，便于备份、迁移或恢复</p>
+        
+        <div className="flex flex-wrap gap-3 mb-4">
           <button
             onClick={() => exportAndDownload(coupons, { format: "json" })}
             className="flex items-center gap-2 px-4 py-2.5 bg-accent-blue/10 text-accent-blue rounded-xl font-medium hover:bg-accent-blue/20 transition-all duration-200"
@@ -813,6 +847,58 @@ export default function ReminderSettings() {
             <FileText className="w-4 h-4" />
             导出 CSV
           </button>
+        </div>
+        
+        <div className="border-t border-accent-grayLight/50 pt-4">
+          <p className="text-sm text-accent-inkMute mb-3">从文件导入数据（支持 JSON 和 CSV 格式）</p>
+          <div className="flex flex-wrap gap-3">
+            <label className="flex items-center gap-2 px-4 py-2.5 bg-accent-orange/10 text-accent-orange rounded-xl font-medium hover:bg-accent-orange/20 transition-all duration-200 cursor-pointer">
+              <Upload className="w-4 h-4" />
+              选择文件导入
+              <input
+                type="file"
+                accept=".json,.csv"
+                onChange={handleImport}
+                disabled={importing}
+                className="hidden"
+              />
+            </label>
+            {importing && (
+              <span className="flex items-center gap-2 text-sm text-accent-inkMute">
+                <span className="animate-spin">⏳</span> 导入中...
+              </span>
+            )}
+          </div>
+          
+          {importResult && (
+            <div
+              className={`mt-4 p-3 rounded-xl flex items-center gap-2 ${
+                importResult === "success"
+                  ? "bg-accent-green/10 text-accent-green"
+                  : "bg-red-50 text-red-500"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                importResult === "success" ? "bg-accent-green" : "bg-red-500"
+              }`}>
+                {importResult === "success" ? (
+                  <Check className="w-3 h-3 text-white" />
+                ) : (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <div className="text-sm font-medium">
+                {importResult === "success"
+                  ? "导入成功！"
+                  : importError}
+                {importResult === "success" && importError && (
+                  <span className="block text-xs opacity-80 mt-1">{importError}</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
