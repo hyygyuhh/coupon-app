@@ -212,10 +212,12 @@ async function fetchFromGist() {
   
   const couponFile = files['coupons.json'];
   const statusFile = files['reminder-status.json'];
+  const configFile = files['reminder-config.json'];
 
   return {
     coupons: couponFile ? JSON.parse(couponFile.content) : [],
-    status: statusFile ? JSON.parse(statusFile.content) : { remindedToday: {} }
+    status: statusFile ? JSON.parse(statusFile.content) : { remindedToday: {} },
+    config: configFile ? JSON.parse(configFile.content) : {}
   };
 }
 
@@ -333,7 +335,22 @@ async function main() {
     return;
   }
 
-  // 4. 筛选即将过期的优惠券
+  // 4. 检查当前时间是否在提醒时间范围内
+  const reminderHour = data.config.dailyReminderHour !== undefined ? data.config.dailyReminderHour : 9;
+  const now = new Date();
+  const currentHourUTC = now.getUTCHours();
+  const reminderHourUTC = reminderHour - 8;
+  const adjustedReminderHourUTC = reminderHourUTC >= 0 ? reminderHourUTC : reminderHourUTC + 24;
+  
+  console.log(`⏰ 当前 UTC 时间：${currentHourUTC}:${String(now.getUTCMinutes()).padStart(2, '0')}`);
+  console.log(`⏰ 配置提醒时间：北京时间 ${reminderHour}:00 (UTC ${adjustedReminderHourUTC}:00)`);
+  
+  if (currentHourUTC !== adjustedReminderHourUTC) {
+    console.log('⏰ 当前时间不在提醒时间范围内，跳过本次检查');
+    return;
+  }
+
+  // 5. 筛选即将过期的优惠券
   const todayKey = getTodayKey();
   const todayStatus = data.status.remindedToday || {};
   

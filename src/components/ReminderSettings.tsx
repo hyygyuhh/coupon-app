@@ -83,18 +83,24 @@ export default function ReminderSettings() {
     persist(next);
   }, [config, persist]);
 
-  const handleTypeChange = useCallback((type: ReminderType) => {
+  const handleTypeChange = useCallback(async (type: ReminderType) => {
     const next = { ...config, type };
     setConfig(next);
     persist(next);
     setTestResult(null);
-  }, [config, persist]);
+    if (syncConfig.enabled && syncConfig.token && syncConfig.gistId) {
+      await syncToCloud(coupons);
+    }
+  }, [config, persist, syncConfig, coupons]);
 
-  const handleTextChange = useCallback((key: "webhook" | "secret", value: string) => {
+  const handleTextChange = useCallback(async (key: "webhook" | "secret", value: string) => {
     const next = { ...config, [key]: value };
     setConfig(next);
     persist(next);
-  }, [config, persist]);
+    if (syncConfig.enabled && syncConfig.token && syncConfig.gistId) {
+      await syncToCloud(coupons);
+    }
+  }, [config, persist, syncConfig, coupons]);
 
   const [reminderDaysInput, setReminderDaysInput] = useState(String(config.reminderDays));
 
@@ -102,15 +108,18 @@ export default function ReminderSettings() {
     setReminderDaysInput(String(config.reminderDays));
   }, [config.reminderDays]);
 
-  const handleDaysChange = useCallback((daysStr: string) => {
+  const handleDaysChange = useCallback(async (daysStr: string) => {
     setReminderDaysInput(daysStr);
     const parsed = parseInt(daysStr, 10);
     if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
       const next = { ...config, reminderDays: parsed };
       setConfig(next);
       persist(next);
+      if (syncConfig.enabled && syncConfig.token && syncConfig.gistId) {
+        await syncToCloud(coupons);
+      }
     }
-  }, [config, persist]);
+  }, [config, persist, syncConfig, coupons]);
 
   const handleDaysBlur = useCallback(() => {
     const parsed = parseInt(reminderDaysInput, 10);
@@ -119,20 +128,26 @@ export default function ReminderSettings() {
     }
   }, [reminderDaysInput, config.reminderDays]);
 
-  const handleDailyReminderChange = useCallback(() => {
+  const handleDailyReminderChange = useCallback(async () => {
     const next = { ...config, dailyReminder: !config.dailyReminder };
     setConfig(next);
     persist(next);
-  }, [config, persist]);
+    if (syncConfig.enabled && syncConfig.token && syncConfig.gistId) {
+      await syncToCloud(coupons);
+    }
+  }, [config, persist, syncConfig, coupons]);
 
-  const handleDailyReminderHourChange = useCallback((hourStr: string) => {
+  const handleDailyReminderHourChange = useCallback(async (hourStr: string) => {
     const parsed = parseInt(hourStr, 10);
     if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) {
       const next = { ...config, dailyReminderHour: parsed };
       setConfig(next);
       persist(next);
+      if (syncConfig.enabled && syncConfig.token && syncConfig.gistId) {
+        await syncToCloud(coupons);
+      }
     }
-  }, [config, persist]);
+  }, [config, persist, syncConfig, coupons]);
 
   // 云同步处理函数
   const handleSyncEnabled = useCallback(() => {

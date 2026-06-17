@@ -9,6 +9,7 @@
 
 import type { Coupon } from "../types/coupon";
 import { loadConfig, saveConfig } from "./storage";
+import { getReminderConfig, type ReminderConfig } from "./reminder";
 
 export interface CloudSyncConfig {
   enabled: boolean;
@@ -138,9 +139,11 @@ export async function uploadToGist(
   token: string,
   gistId: string,
   coupons: Coupon[],
-  status: ReminderStatus
+  status: ReminderStatus,
+  config?: ReminderConfig
 ): Promise<boolean> {
   try {
+    const reminderConfig = config || getReminderConfig();
     const response = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: "PATCH",
       headers: getHeaders(token),
@@ -152,6 +155,14 @@ export async function uploadToGist(
           },
           "reminder-status.json": {
             content: JSON.stringify(status, null, 2),
+          },
+          "reminder-config.json": {
+            content: JSON.stringify({
+              dailyReminderHour: reminderConfig.dailyReminderHour,
+              reminderDays: reminderConfig.reminderDays,
+              enabled: reminderConfig.enabled,
+              type: reminderConfig.type,
+            }, null, 2),
           },
         },
       }),
