@@ -1,5 +1,8 @@
-import { Plus, Settings } from "lucide-react";
+import { Moon, Plus, Settings, Sun } from "lucide-react";
 import LogoIcon from "./LogoIcon";
+import { getTheme, toggleTheme } from "../utils/theme";
+import { THEME } from "../utils/constants";
+import { useState, useEffect } from "react";
 
 interface Props {
   onAdd: () => void;
@@ -9,6 +12,20 @@ interface Props {
 }
 
 export default function NavBar({ onAdd, onSettings, onHome, isHome }: Props) {
+  const [isDark, setIsDark] = useState(getTheme() === THEME.DARK);
+
+  useEffect(() => {
+    const handleChange = () => {
+      setIsDark(getTheme() === THEME.DARK);
+    };
+    window.addEventListener("storage", handleChange);
+    return () => window.removeEventListener("storage", handleChange);
+  }, []);
+
+  const handleToggleTheme = () => {
+    const newTheme = toggleTheme();
+    setIsDark(newTheme === THEME.DARK);
+  };
   return (
     <header className="sticky top-0 z-20 backdrop-blur-md bg-cream/80 dark:bg-[#2d2d44]/90 border-b border-accent-orangeLight/40 dark:border-white/10 transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -32,6 +49,14 @@ export default function NavBar({ onAdd, onSettings, onHome, isHome }: Props) {
           </div>
         </button>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleToggleTheme}
+            className="p-2 text-accent-inkMute dark:text-gray-400 hover:text-accent-orange hover:bg-accent-orangeLight/30 dark:hover:bg-white/10 rounded-full transition"
+            title={isDark ? "切换到浅色模式" : "切换到深色模式"}
+          >
+            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
           <button
             type="button"
             onClick={onSettings}
