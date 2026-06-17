@@ -6,8 +6,6 @@ import { loadConfig, saveConfig } from "./storage";
 
 export type ReminderType = "dingtalk" | "feishu";
 
-export type ReminderTimeSlot = "morning" | "afternoon" | "evening" | "any";
-
 export interface ReminderConfig {
   enabled: boolean;
   type: ReminderType;
@@ -16,7 +14,6 @@ export interface ReminderConfig {
   reminderDays: number;
   lastReminderTime: number;
   testMode: boolean;
-  timeSlot: ReminderTimeSlot;
   dailyReminder: boolean;
   dailyReminderHour: number;
 }
@@ -29,7 +26,6 @@ export const DEFAULT_CONFIG: ReminderConfig = {
   reminderDays: 3,
   lastReminderTime: 0,
   testMode: false,
-  timeSlot: "morning",
   dailyReminder: true,
   dailyReminderHour: 9,
 };
@@ -69,23 +65,6 @@ export function getExpiringCoupons(
       coupon: c,
     }))
     .sort((a, b) => a.daysLeft - b.daysLeft);
-}
-
-export function shouldSendReminderNow(config: ReminderConfig): boolean {
-  const now = new Date();
-  const currentHour = now.getHours();
-
-  switch (config.timeSlot) {
-    case "morning":
-      return currentHour >= 7 && currentHour < 12;
-    case "afternoon":
-      return currentHour >= 12 && currentHour < 18;
-    case "evening":
-      return currentHour >= 18 && currentHour < 23;
-    case "any":
-    default:
-      return true;
-  }
 }
 
 export function getTodayReminderKey(): string {
@@ -157,10 +136,6 @@ export async function sendReminderIfNeeded(
   });
 
   if (needReminder.length === 0) {
-    return false;
-  }
-
-  if (!shouldSendReminderNow(reminderConfig)) {
     return false;
   }
 
