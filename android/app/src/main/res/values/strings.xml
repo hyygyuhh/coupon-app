@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">优惠券管家</string>
-    <string name="title_activity_main">优惠券管家</string>
-    <string name="package_name">com.couponmanager.app</string>
-    <string name="custom_url_scheme">com.couponmanager.app</string>
-</resources>
