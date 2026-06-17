@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check } from "lucide-react";
 import ToggleSwitch from "./ToggleSwitch";
-import dingtalkLogo from "../assets/dingtask.svg";
+import dingtalkLogo from "../assets/dingtalk.svg";
 import feishuLogo from "../assets/feishu.svg";
 import {
   getReminderConfig,
