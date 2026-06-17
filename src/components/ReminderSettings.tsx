@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Moon, Sun, Calendar, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check } from "lucide-react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Calendar, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check } from "lucide-react";
 import ToggleSwitch from "./ToggleSwitch";
-import { toggleTheme, getTheme, type ThemeType } from "../utils/theme";
 import {
   getReminderConfig,
   saveReminderConfig,
@@ -59,7 +58,6 @@ export default function ReminderSettings() {
   const [testing, setTesting] = useState(false);
   const [testingReminder, setTestingReminder] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
-  const [theme, setTheme] = useState<ThemeType>(() => getTheme());
   
   // 数据导入状态
   const [importing, setImporting] = useState(false);
@@ -73,11 +71,6 @@ export default function ReminderSettings() {
   
   const coupons = useCouponStore((state) => state.coupons);
   const setCoupons = useCouponStore((state) => state.setCoupons);
-
-  const handleToggleTheme = useCallback(() => {
-    const newTheme = toggleTheme();
-    setTheme(newTheme);
-  }, []);
 
   const persist = useCallback((next: ReminderConfig) => {
     saveReminderConfig(next);
@@ -658,31 +651,6 @@ export default function ReminderSettings() {
               </span>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* 主题切换 */}
-      <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
-        <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
-          <Moon className="w-5 h-5 text-accent-orange" />
-          外观主题
-        </h3>
-        <p className="text-sm text-accent-inkMute mb-4">选择您喜欢的界面风格</p>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleToggleTheme}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
-              theme === "dark"
-                ? "bg-gray-800 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {theme === "dark" ? (
-              <><Moon className="w-4 h-4" /> 深色模式</>
-            ) : (
-              <><Sun className="w-4 h-4" /> 浅色模式</>
-            )}
-          </button>
         </div>
       </div>
 
