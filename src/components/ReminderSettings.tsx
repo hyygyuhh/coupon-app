@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check } from "lucide-react";
 import ToggleSwitch from "./ToggleSwitch";
+import dingtalkLogo from "../assets/dingtalk.svg";
+import feishuLogo from "../assets/feishu.svg";
 import {
   getReminderConfig,
   saveReminderConfig,
@@ -20,33 +22,23 @@ import {
 import { useCouponStore } from "../store/couponStore";
 import { exportAndDownload, importFromFile, type ImportResult } from "../utils/export";
 
-function DingTalkIcon({ className = "w-8 h-8" }: { className?: string }) {
+function DingTalkIcon({ className = "w-10 h-10" }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="18" fill="#0089FF"/>
-      <path d="M20 20 L16 30 L20 38 L24 30 L20 20" fill="white"/>
-      <path d="M28 20 L24 30 L28 38 L32 30 L28 20" fill="white"/>
-      <path d="M22 28 L24 32 L26 28" fill="#0089FF"/>
-    </svg>
+    <img
+      src={dingtalkLogo}
+      alt="DingTalk"
+      className={`${className} object-contain`}
+    />
   );
 }
 
-function FeishuIcon({ className = "w-8 h-8" }: { className?: string }) {
+function FeishuIcon({ className = "w-10 h-10" }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 48 48" fill="none">
-      <defs>
-        <linearGradient id="feishu-g1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#00D6D9"/>
-          <stop offset="100%" stopColor="#478DE0"/>
-        </linearGradient>
-        <linearGradient id="feishu-g2" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#478DE0"/>
-          <stop offset="100%" stopColor="#6F8FF7"/>
-        </linearGradient>
-      </defs>
-      <path d="M16 24 Q24 12 32 24" stroke="url(#feishu-g1)" strokeWidth="7" strokeLinecap="round" fill="none"/>
-      <path d="M12 30 Q24 18 36 30" stroke="url(#feishu-g2)" strokeWidth="7" strokeLinecap="round" fill="none"/>
-    </svg>
+    <img
+      src={feishuLogo}
+      alt="Feishu"
+      className={`${className} object-contain`}
+    />
   );
 }
 
