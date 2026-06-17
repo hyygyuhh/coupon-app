@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { Check, X, AlertCircle, Info } from "lucide-react";
 
 export interface Toast {
@@ -8,48 +8,59 @@ export interface Toast {
   duration?: number;
 }
 
-interface ToastStore {
+interface ToastContextValue {
   toasts: Toast[];
   add: (toast: Omit<Toast, "id">) => void;
   remove: (id: string) => void;
   clear: () => void;
 }
 
-const toastStore: ToastStore = {
-  toasts: [],
-  add(toast) {
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-    toastStore.toasts = [...toastStore.toasts, { ...toast, id }];
-  },
-  remove(id) {
-    toastStore.toasts = toastStore.toasts.filter((t) => t.id !== id);
-  },
-  clear() {
-    toastStore.toasts = [];
-  },
-};
+const ToastContext = createContext<ToastContextValue | null>(null);
 
-export const useToast = () => {
+let addToastCallback: ((toast: Omit<Toast, "id">) => void) | null = null;
+
+export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  useEffect(() => {
-    const update = () => setToasts([...toastStore.toasts]);
-    update();
-    const observer = new MutationObserver(update);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+  const add = useCallback((toast: Omit<Toast, "id">) => {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    setToasts((prev) => [...prev, { ...toast, id }]);
   }, []);
 
-  return {
-    toasts,
-    add: toastStore.add,
-    remove: toastStore.remove,
-    clear: toastStore.clear,
-  };
+  const remove = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const clear = useCallback(() => {
+    setToasts([]);
+  }, []);
+
+  useEffect(() => {
+    addToastCallback = add;
+    return () => {
+      addToastCallback = null;
+    };
+  }, [add]);
+
+  return (
+    <ToastContext.Provider value={{ toasts, add, remove, clear }}>
+      {children}
+    </ToastContext.Provider>
+  );
+}
+
+export const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error("useToast must be used within a ToastProvider");
+  }
+  return context;
 };
 
 export const showToast = (type: Toast["type"], message: string, duration?: number) => {
-  toastStore.add({ type, message, duration });
+  if (addToastCallback) {
+    addToastCallback({ type, message, duration });
+  }
 };
 
 const icons = {
@@ -70,13 +81,15 @@ export default function ToastContainer() {
   const { toasts, remove } = useToast();
 
   useEffect(() => {
-    toasts.forEach((toast) => {
-      const timer = setTimeout(
-        () => remove(toast.id),
-        toast.duration || 3000
-      );
-      return () => clearTimeout(timer);
+    const timers = toasts.map((toast) => {
+      return setTimeout(() => {
+        remove(toast.id);
+      }, toast.duration || 3000);
     });
+
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+    };
   }, [toasts, remove]);
 
   if (toasts.length === 0) return null;
