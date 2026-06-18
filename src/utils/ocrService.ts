@@ -1,47 +1,10 @@
 /**
- * OCR 识别服务（v4，加载速度优化版）
+ * OCR 识别服务（Kimi AI 专用版）
  * ---------------------------------------------------------------
- * 效率优化：
- * 1. 智能扫描策略：先用最快模式，置信度足够则提前终止
- * 2. 并行图片预处理：Promise.all 同时生成多个变体
- * 3. 减少扫描次数：从 6 次降到 2-3 次
- * 4. 优化图片尺寸：根据图片内容动态调整
- * 5. Worker 预热：页面加载时提前初始化
- * 6. CDN 加速：使用 jsDelivr CDN 下载语言包
- * 7. 全局状态：暴露引擎加载进度供 UI 展示
+ * 使用 Kimi-K2.6 模型进行优惠券识别，一步完成识别+解析。
  */
 
-import { createWorker, Worker, createScheduler, Scheduler } from "tesseract.js";
-import { processImage, type ProcessedImage, generateMultiResolution, generateFastVariant, generateEnhancedVariants } from "./imageProcessor";
 import { hashFile } from "./crypto";
-
-// ==================== 全局预加载状态 ====================
-
-export type OCREngineStatus = "idle" | "loading" | "ready" | "error";
-
-let engineStatus: OCREngineStatus = "idle";
-let engineProgress: number = 0;
-let engineStatusText: string = "";
-const statusListeners = new Set<() => void>();
-
-function notifyStatusChange() {
-  statusListeners.forEach((fn) => fn());
-}
-
-/**
- * 订阅 OCR 引擎状态变化
- */
-export function subscribeOCRStatus(fn: () => void): () => void {
-  statusListeners.add(fn);
-  return () => { statusListeners.delete(fn); };
-}
-
-/**
- * 获取当前引擎状态
- */
-export function getOCRStatus(): { status: OCREngineStatus; progress: number; statusText: string } {
-  return { status: engineStatus, progress: engineProgress, statusText: engineStatusText };
-}
 
 export interface OCRResult {
   text: string;
@@ -52,7 +15,6 @@ export interface OCRResult {
     confidence: number;
     width: number;
   }[];
-  // AI 视觉识别直接返回的结构化数据
   aiCoupons?: Array<{
     name?: string;
     platform?: string;
@@ -150,309 +112,8 @@ export function clearOCRCache(): void {
   }
 }
 
-// 全局 Worker 实例（单例模式）
-let workerPromise: Promise<Worker> | null = null;
-let schedulerPromise: Promise<Scheduler> | null = null;
-
-// 状态映射
-export const STATUS_MAP: Record<string, string> = {
-  "loading tesseract core": "正在加载识别引擎",
-  "initializing tesseract": "正在初始化引擎",
-  "loading language traineddata": "正在下载语言包（首次使用）",
-  "initializing api": "正在加载字库",
-  "recognizing text": "正在识别文字",
-};
-
-type PSM = "11" | "6" | "3" | "8";
-
-// 置信度阈值：高于此值则提前终止
-const CONFIDENCE_THRESHOLD = 88;
-// 低置信度阈值：低于此值需要重试
-const LOW_CONFIDENCE_THRESHOLD = 40;
-// 中等置信度阈值：低于此值继续尝试其他变体
-const MEDIUM_CONFIDENCE_THRESHOLD = 65;
-
-const STRATEGY_LABELS = [
-  "轻量",
-  "标准",
-  "增强",
-  "阈值",
-  "彩色",
-];
-
 /**
- * 获取或创建 Worker（单例）
- * 添加超时和重试机制
- */
-async function getWorker(): Promise<Worker> {
-  if (workerPromise) return workerPromise;
-
-  const MAX_RETRIES = 2;
-  const TIMEOUT_MS = 60000;
-
-  workerPromise = (async () => {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        engineStatus = "loading";
-        engineProgress = 0;
-        engineStatusText = attempt > 1 ? "重试加载识别引擎..." : "正在加载识别引擎";
-        notifyStatusChange();
-
-        console.log(`[OCR] 初始化 Worker (尝试 ${attempt}/${MAX_RETRIES})...`);
-        const start = performance.now();
-
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("OCR 引擎加载超时")), TIMEOUT_MS)
-        );
-
-        const workerPromise = createWorker("chi_sim", 1, {
-          workerPath: `${window.location.origin}/coupon-app/worker.min.js`,
-          corePath: `${window.location.origin}/coupon-app/tesseract-core.wasm.js`,
-          langPath: `${window.location.origin}/coupon-app/tessdata`,
-          logger: (m) => {
-            if (m.status === "loading tesseract core") {
-              engineStatusText = "正在加载识别引擎";
-              engineProgress = 0.1;
-            } else if (m.status === "initializing tesseract") {
-              engineStatusText = "正在初始化引擎";
-              engineProgress = 0.2;
-            } else if (m.status === "loading language traineddata") {
-              engineStatusText = `正在下载语言包 ${Math.round(m.progress * 100)}%`;
-              engineProgress = 0.2 + m.progress * 0.6;
-            } else if (m.status === "initializing api") {
-              engineStatusText = "正在加载字库";
-              engineProgress = 0.85;
-            } else if (m.status === "recognizing text") {
-              engineStatusText = "正在识别文字";
-            }
-            notifyStatusChange();
-          },
-        });
-
-        const worker = await Promise.race([workerPromise, timeoutPromise]);
-
-        const elapsed = ((performance.now() - start) / 1000).toFixed(1);
-        console.log(`[OCR] Worker 初始化完成 (${elapsed}s)`);
-
-        engineStatus = "ready";
-        engineProgress = 1;
-        engineStatusText = "识别引擎已就绪";
-        notifyStatusChange();
-
-        return worker;
-      } catch (error) {
-        console.error(`[OCR] Worker 初始化失败 (尝试 ${attempt}/${MAX_RETRIES}):`, error);
-        if (attempt < MAX_RETRIES) {
-          engineStatusText = "加载失败，正在重试...";
-          notifyStatusChange();
-          await new Promise((r) => setTimeout(r, 2000));
-        } else {
-          engineStatus = "error";
-          engineStatusText = "加载失败，请检查网络或稍后重试";
-          notifyStatusChange();
-          throw error;
-        }
-      }
-    }
-    throw new Error("所有重试均失败");
-  })();
-
-  return workerPromise;
-}
-
-/**
- * 获取调度器（用于并行识别）
- */
-async function getScheduler(): Promise<Scheduler> {
-  if (schedulerPromise) return schedulerPromise;
-
-  schedulerPromise = (async () => {
-    const scheduler = createScheduler();
-    // 添加 2 个 worker 实现并行识别
-    const worker1 = await getWorker();
-    scheduler.addWorker(worker1);
-    return scheduler;
-  })();
-
-  return schedulerPromise;
-}
-
-/**
- * 单次识别
- */
-async function recognizeOnce(
-  worker: Worker,
-  image: Blob,
-  psm: PSM,
-  onProgress?: (progress: number, status: string) => void
-): Promise<{ text: string; confidence: number }> {
-  await worker.setParameters({
-    tessedit_pageseg_mode: psm,
-  } as any);
-
-  const { data } = await worker.recognize(image);
-
-  return {
-    text: data.text || "",
-    confidence: data.confidence || 0,
-  };
-}
-
-/**
- * 并行生成图片变体（优化预处理速度）
- * 采用分层策略：先用轻量处理，置信度不足再用增强处理
- */
-async function generateVariantsParallel(file: File): Promise<ProcessedImage[]> {
-  return generateMultiResolution(file);
-}
-
-/**
- * 快速模式变体生成
- */
-async function generateFastVariants(file: File): Promise<ProcessedImage[]> {
-  const fast = await generateFastVariant(file);
-  return [fast];
-}
-
-/**
- * 增强模式变体生成（用于低置信度重试）
- */
-async function generateEnhancedVariantsForRetry(file: File): Promise<ProcessedImage[]> {
-  return generateEnhancedVariants(file);
-}
-
-function loadImage(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("无法加载图片"));
-    };
-    img.src = url;
-  });
-}
-
-/**
- * 合并多轮结果
- */
-function mergeResults(
-  rounds: { mode: string; text: string; confidence: number; width: number }[]
-): string {
-  if (rounds.length === 0) return "";
-  if (rounds.length === 1) return rounds[0].text;
-
-  // 计算中文丰富度
-  function chineseRatio(text: string): number {
-    const chars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-    const total = text.replace(/\s/g, "").length;
-    return total > 0 ? chars / total : 0;
-  }
-
-  // 综合评分
-  const scored = rounds.map((r) => {
-    const ratio = chineseRatio(r.text);
-    const score = r.confidence * (1 + ratio * 2);
-    return { ...r, score };
-  });
-
-  scored.sort((a, b) => b.score - a.score);
-
-  const primary = scored[0];
-  const primaryLines = new Set<string>();
-  const resultLines: string[] = [];
-
-  for (const line of primary.text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const key = trimmed.replace(/\s+/g, "");
-    primaryLines.add(key);
-    resultLines.push(trimmed);
-  }
-
-  // 补充次优结果中的中文行
-  for (let i = 1; i < scored.length; i++) {
-    const r = scored[i];
-    if (r.confidence < primary.confidence * 0.7) continue;
-
-    for (const line of r.text.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || !/[\u4e00-\u9fa5]/.test(trimmed)) continue;
-      const key = trimmed.replace(/\s+/g, "");
-      if (!primaryLines.has(key)) {
-        primaryLines.add(key);
-        resultLines.push(trimmed);
-      }
-    }
-  }
-
-  return resultLines
-    .map(stripOcrNoise)
-    .filter(isValidTextLine)
-    .join("\n");
-}
-
-/**
- * 增强版噪声过滤和文本清理
- */
-function stripOcrNoise(line: string): string {
-  if (!line) return line;
-  
-  return line
-    // 移除特殊符号和乱码字符
-    .replace(/[<>\[\]()（）«»‹›→←↑↓■□★☆*~·●■◆◇▲△▼▽★☆●○◎◇◆□■△▲▼▽→←↑↓↖↗↘↙〓]+/g, " ")
-    // 移除常见OCR错误识别的单词
-    .replace(/\b(AUH|EHR|Vv|co|AD|LINO|LUCK|LINE|LOGO|LLNO|LNO|ARAH|AHE|AUV|AIA|AVA|HEY|AOL|AOL|AOL|ARO|ARE|ARE)\b/gi, " ")
-    .replace(/\b(WWW|COM|NET|ORG|CN|COMCN|HTTP|HTTPS|WWWCOM)\b/gi, " ")
-    // 移除孤立的字母（1-2个字母的单词）
-    .replace(/\b[A-Za-z]{1,2}\b/g, " ")
-    // 移除首尾的短字母序列
-    .replace(/^[A-Za-z]{1,4}\s+/, " ")
-    .replace(/\s+[A-Za-z]{1,4}$/, " ")
-    // 移除引号和标点
-    .replace(/["''""`'；；；；。。。，，，]/g, " ")
-    // 移除重复字符
-    .replace(/(.)\1{3,}/g, "$1")
-    // 移除空白字符
-    .replace(/[\t\n\r]+/g, " ")
-    // 合并多个空格
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
-/**
- * 检测是否为有效文本行（过滤无意义的噪声行）
- */
-function isValidTextLine(line: string): boolean {
-  if (!line || line.length < 2) return false;
-  
-  const trimmed = line.trim();
-  
-  // 纯数字且长度小于3（可能是噪声）
-  if (/^\d{1,2}$/.test(trimmed)) return false;
-  
-  // 纯符号
-  if (/^[^\w\u4e00-\u9fa5]+$/.test(trimmed)) return false;
-  
-  // 过长的连续相同字符
-  if (/(\w)\1{6,}/.test(trimmed)) return false;
-  
-  // 检查是否包含有意义的内容
-  const hasChinese = /[\u4e00-\u9fa5]/.test(trimmed);
-  const hasNumber = /\d+/.test(trimmed);
-  const hasWord = /[A-Za-z]{3,}/.test(trimmed);
-  
-  return hasChinese || hasNumber || hasWord;
-}
-
-/**
- * 主入口：识别图片
- * 
- * 分层策略：
- * 1. 检查是否配置了 AI 视觉识别，优先使用（准确率最高）
- * 2. 否则检查是否配置了百度 OCR
- * 3. 最后使用本地 Tesseract.js
+ * 主入口：识别图片（使用 Kimi AI）
  */
 export async function recognizeImage(
   file: File,
@@ -460,7 +121,6 @@ export async function recognizeImage(
 ): Promise<OCRResult> {
   onProgress?.(0, "正在读取图片");
 
-  // 检查是否有缓存
   const cached = await getCachedResult(file);
   if (cached) {
     console.log("[OCR] 使用缓存结果");
@@ -468,349 +128,43 @@ export async function recognizeImage(
     return cached;
   }
 
-  // 检查是否使用 AI 视觉识别（优先级最高）
-  const { shouldUseAIVision } = await import("./aiVisionOCR");
-  if (shouldUseAIVision()) {
-    return await recognizeWithAIVisionWrapper(file, onProgress);
+  const { recognizeWithKimi, hasKimiConfig } = await import("./aiVisionOCR");
+
+  if (!hasKimiConfig()) {
+    throw new Error("请先在设置中配置 Kimi API Key");
   }
-
-  // 检查是否使用百度 OCR
-  const { getOCRConfig } = await import("./ocrConfig");
-  const ocrConfig = getOCRConfig();
-
-  if (ocrConfig.engine === "baidu" && ocrConfig.baiduApiKey && ocrConfig.baiduSecretKey) {
-    return await recognizeWithCloudOCR(file, onProgress);
-  }
-
-  return await recognizeWithLocalOCR(file, onProgress);
-}
-
-/**
- * AI 视觉识别包装器
- */
-async function recognizeWithAIVisionWrapper(
-  file: File,
-  onProgress?: (progress: number, status: string) => void
-): Promise<OCRResult> {
-  const { recognizeWithAIVision } = await import("./aiVisionOCR");
 
   try {
-    const result = await recognizeWithAIVision(file, onProgress);
+    const result = await recognizeWithKimi(file, onProgress);
 
-    // 转换为 OCRResult 格式
     const ocrResult: OCRResult = {
       text: result.rawText || "",
       confidence: result.confidence,
       rounds: result.coupons.map((c, i) => ({
-        mode: `AI识别-${i + 1}`,
+        mode: `Kimi AI-${i + 1}`,
         text: `${c.name} ${c.amount || ""} ${c.expiryDate || ""}`.trim(),
         confidence: result.confidence,
         width: 0,
       })),
-      // AI 直接返回结构化数据
       aiCoupons: result.coupons,
     };
 
+    setCachedResult(file, ocrResult);
     return ocrResult;
   } catch (error: any) {
-    console.warn("[OCR] AI 视觉识别失败，降级到本地识别:", error?.message);
-    onProgress?.(0.35, "AI 识别失败，自动切换到本地识别…");
-    return await recognizeWithLocalOCR(file, onProgress);
+    console.error("[OCR] Kimi AI 识别失败:", error);
+    throw error;
   }
 }
 
-/**
- * 云端 OCR 识别（通过 CORS 代理）
- */
-async function recognizeWithCloudOCR(
-  file: File,
-  onProgress?: (progress: number, status: string) => void
-): Promise<OCRResult> {
-  const { recognizeWithBaidu, isBaiduCorsError } = await import("./baiduOCR");
-
-  onProgress?.(0.1, "正在准备图片");
-
-  // 将文件转换为 base64
-  const reader = new FileReader();
-  const imageDataUrl = await new Promise<string>((resolve, reject) => {
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-  onProgress?.(0.3, "正在调用云端识别");
-
-  try {
-    const text = await recognizeWithBaidu(imageDataUrl);
-
-    onProgress?.(1, "识别完成");
-
-    const result: OCRResult = {
-      text: text || "",
-      confidence: 95,
-      rounds: [{ mode: "百度云 OCR", text, confidence: 95, width: 0 }],
-    };
-
-    setCachedResult(file, result);
-    return result;
-  } catch (error: any) {
-    console.warn("[OCR] 云端识别失败，降级到本地识别:", error?.message || error);
-
-    // 云端失败（包括 CORS 代理不可用时）降级到本地 Tesseract.js
-    if (isBaiduCorsError(error)) {
-      onProgress?.(0.35, "云端受限，自动切换到本地识别…");
-    } else {
-      onProgress?.(0.35, "云端不可用，自动切换到本地识别…");
-    }
-    try {
-      return await recognizeWithLocalOCR(file, onProgress);
-    } catch {
-      onProgress?.(0, `识别失败: ${error?.message}`);
-      throw error;
-    }
-  }
+export function subscribeOCRStatus(fn: () => void): () => void {
+  return () => {};
 }
 
-/**
- * 本地 Tesseract.js OCR 识别
- */
-async function recognizeWithLocalOCR(
-  file: File,
-  onProgress?: (progress: number, status: string) => void
-): Promise<OCRResult> {
-  const startTime = performance.now();
-
-  // 步骤 1：并行生成图片变体（分层策略）
-  onProgress?.(0.05, "正在优化图片");
-  const variants = await generateVariantsParallel(file);
-
-  try {
-    // 步骤 2：获取 Worker
-    onProgress?.(0.15, "正在加载识别引擎");
-    const worker = await getWorker();
-
-    const rounds: {
-      mode: string;
-      text: string;
-      confidence: number;
-      width: number;
-    }[] = [];
-
-    let currentBestText = "";
-    let currentBestConfidence = 0;
-
-    // ===== 阶段 1：快速扫描（轻量处理）=====
-    onProgress?.(0.2, "正在识别文字");
-    const result0 = await recognizeOnce(worker, variants[0].blob, "11", (p) => {
-      onProgress?.(0.2 + p * 0.2, "正在识别文字");
-    });
-    
-    rounds.push({
-      mode: `PSM11-${STRATEGY_LABELS[0]}`,
-      text: result0.text,
-      confidence: result0.confidence,
-      width: variants[0].width,
-    });
-
-    currentBestText = result0.text;
-    currentBestConfidence = result0.confidence;
-
-    // 高置信度提前终止
-    if (result0.confidence >= CONFIDENCE_THRESHOLD) {
-      const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
-      console.log(`[OCR] 提前终止，置信度 ${result0.confidence.toFixed(1)}，耗时 ${elapsed}s`);
-      
-      onProgress?.(1, "识别完成");
-      const result: OCRResult = {
-        text: result0.text,
-        confidence: result0.confidence,
-        rounds,
-      };
-      setCachedResult(file, result);
-      return result;
-    }
-
-    // ===== 阶段 2：标准处理 + PSM 6 =====
-    onProgress?.(0.45, "正在补充识别");
-    const result1 = await recognizeOnce(worker, variants[1].blob, "6", (p) => {
-      onProgress?.(0.45 + p * 0.15, "正在补充识别");
-    });
-    
-    rounds.push({
-      mode: `PSM6-${STRATEGY_LABELS[1]}`,
-      text: result1.text,
-      confidence: result1.confidence,
-      width: variants[1].width,
-    });
-
-    if (result1.confidence > currentBestConfidence) {
-      currentBestText = result1.text;
-      currentBestConfidence = result1.confidence;
-    }
-
-    // 检查是否可以提前终止
-    if (currentBestConfidence >= CONFIDENCE_THRESHOLD) {
-      const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
-      console.log(`[OCR] 提前终止，置信度 ${currentBestConfidence.toFixed(1)}，耗时 ${elapsed}s`);
-      
-      onProgress?.(1, "识别完成");
-      const result: OCRResult = {
-        text: currentBestText,
-        confidence: currentBestConfidence,
-        rounds,
-      };
-      setCachedResult(file, result);
-      return result;
-    }
-
-    // ===== 阶段 3：尝试其他变体和 PSM 模式 =====
-    const psmModes: PSM[] = ["11", "6", "3"];
-    const variantIndices = currentBestConfidence < LOW_CONFIDENCE_THRESHOLD 
-      ? [2, 3]  // 低置信度：尝试增强和阈值处理
-      : currentBestConfidence < MEDIUM_CONFIDENCE_THRESHOLD 
-        ? [2]    // 中等置信度：尝试增强处理
-        : [];    // 较高置信度：跳过
-
-    for (const idx of variantIndices) {
-      if (idx >= variants.length) continue;
-      
-      for (const psm of psmModes) {
-        onProgress?.(0.65, `正在尝试 ${STRATEGY_LABELS[idx]}处理`);
-        const result = await recognizeOnce(worker, variants[idx].blob, psm, (p) => {
-          onProgress?.(0.65 + p * 0.1, `正在尝试 ${STRATEGY_LABELS[idx]}处理`);
-        });
-        
-        rounds.push({
-          mode: `PSM${psm}-${STRATEGY_LABELS[idx]}`,
-          text: result.text,
-          confidence: result.confidence,
-          width: variants[idx].width,
-        });
-
-        if (result.confidence > currentBestConfidence) {
-          currentBestText = result.text;
-          currentBestConfidence = result.confidence;
-        }
-
-        // 提前终止检查
-        if (currentBestConfidence >= CONFIDENCE_THRESHOLD) {
-          const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
-          console.log(`[OCR] 提前终止，置信度 ${currentBestConfidence.toFixed(1)}，耗时 ${elapsed}s`);
-          
-          onProgress?.(1, "识别完成");
-          const result: OCRResult = {
-            text: currentBestText,
-            confidence: currentBestConfidence,
-            rounds,
-          };
-          setCachedResult(file, result);
-          return result;
-        }
-      }
-    }
-
-    // ===== 阶段 4：彩色处理（最后尝试）=====
-    if (currentBestConfidence < MEDIUM_CONFIDENCE_THRESHOLD && variants.length > 4) {
-      onProgress?.(0.85, "正在尝试彩色识别");
-      const colorResult = await recognizeOnce(worker, variants[4].blob, "11", (p) => {
-        onProgress?.(0.85 + p * 0.1, "正在尝试彩色识别");
-      });
-      
-      rounds.push({
-        mode: `PSM11-${STRATEGY_LABELS[4]}`,
-        text: colorResult.text,
-        confidence: colorResult.confidence,
-        width: variants[4].width,
-      });
-
-      if (colorResult.confidence > currentBestConfidence) {
-        currentBestText = colorResult.text;
-        currentBestConfidence = colorResult.confidence;
-      }
-    }
-
-    // ===== 阶段 5：合并结果 =====
-    onProgress?.(0.98, "正在整理识别结果");
-    const merged = mergeResults(rounds);
-
-    const finalConfidence =
-      rounds.reduce((sum, r) => sum + r.confidence, 0) / rounds.length;
-
-    const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
-    console.log(`[OCR] 完成，${rounds.length} 轮扫描，平均置信度 ${finalConfidence.toFixed(1)}，耗时 ${elapsed}s`);
-
-    const result: OCRResult = {
-      text: merged,
-      confidence: finalConfidence,
-      rounds,
-    };
-
-    setCachedResult(file, result);
-
-    onProgress?.(1, "识别完成");
-    return result;
-  } finally {
-    // 清理
-    for (const v of variants) {
-      if (v.url) URL.revokeObjectURL(v.url);
-    }
-  }
+export function getOCRStatus(): { status: "idle" | "loading" | "ready" | "error"; progress: number; statusText: string } {
+  return { status: "ready", progress: 1, statusText: "Kimi AI 已就绪" };
 }
 
-/**
- * 预加载 OCR 引擎（页面加载时立即调用）
- */
-export async function preloadOCR(
-  onProgress?: (progress: number, status: string) => void
-): Promise<void> {
-  onProgress?.(0, "正在准备识别引擎");
-  try {
-    await getWorker();
-    onProgress?.(1, "OCR 引擎已就绪");
-  } catch (error) {
-    console.warn("OCR 预加载失败:", error);
-    engineStatus = "error";
-    engineStatusText = "引擎加载失败";
-    notifyStatusChange();
-    onProgress?.(1, "OCR 预加载失败");
-  }
-}
-
-/**
- * 快速模式：单次扫描
- */
-export async function recognizeImageFast(
-  file: File,
-  onProgress?: (progress: number, status: string) => void
-): Promise<OCRResult> {
-  onProgress?.(0, "正在读取图片");
-  
-  const variant = await processImage(file, {
-    targetWidth: 1400,
-    quality: 0.9,
-    grayscale: true,
-    contrast: 1.4,
-  });
-
-  onProgress?.(0.2, "正在加载识别引擎");
-  const worker = await getWorker();
-
-  onProgress?.(0.4, "正在识别文字");
-  const result = await recognizeOnce(worker, variant.blob, "11", (p) => {
-    onProgress?.(0.4 + p * 0.55, "正在识别文字");
-  });
-
-  onProgress?.(1, "识别完成");
-  return {
-    text: result.text,
-    confidence: result.confidence,
-    rounds: [
-      {
-        mode: "fast-PSM11",
-        text: result.text,
-        confidence: result.confidence,
-        width: variant.width,
-      },
-    ],
-  };
+export async function preloadOCR(onProgress?: (progress: number, status: string) => void): Promise<void> {
+  onProgress?.(1, "Kimi AI 已就绪");
 }

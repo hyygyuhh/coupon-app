@@ -1,9 +1,6 @@
-export type OCREngine = "local" | "baidu" | "ai-vision";
-
 export interface OCRConfig {
-  engine: OCREngine;
-  baiduApiKey: string;
-  baiduSecretKey: string;
+  kimiApiKey: string;
+  kimiBaseURL: string;
 }
 
 const OCR_CONFIG_KEY = "ocr-config";
@@ -13,21 +10,17 @@ export function getOCRConfig(): OCRConfig {
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      // 兼容旧数据
       return {
-        engine: parsed.engine === "baidu" ? "baidu" : parsed.engine === "ai-vision" ? "ai-vision" : "local",
-        baiduApiKey: parsed.baiduApiKey || "",
-        baiduSecretKey: parsed.baiduSecretKey || "",
+        kimiApiKey: parsed.kimiApiKey || parsed.apiKey || "",
+        kimiBaseURL: parsed.kimiBaseURL || parsed.baseURL || "https://agentrs.jd.com/api/saas/openai-u/v1",
       };
     } catch {
       // ignore
     }
   }
-  // 默认使用本地 OCR，避免浏览器 CORS 直接阻断识别
   return {
-    engine: "local",
-    baiduApiKey: "",
-    baiduSecretKey: "",
+    kimiApiKey: "",
+    kimiBaseURL: "https://agentrs.jd.com/api/saas/openai-u/v1",
   };
 }
 

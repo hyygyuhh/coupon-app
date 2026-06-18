@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Camera, Check, Copy, X, AlertCircle, Loader2 } from "lucide-react";
 import type { Coupon, CouponInput } from "../types/coupon";
-import { recognizeImage, subscribeOCRStatus, getOCRStatus, type OCREngineStatus } from "../utils/ocrService";
+import { recognizeImage, subscribeOCRStatus, getOCRStatus } from "../utils/ocrService";
 import {
   mergeToInput,
   parseMultipleCoupons,
@@ -53,7 +53,7 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
   const [activeIdx, setActiveIdx] = useState<number>(-1);
 
   // OCR 引擎预加载状态
-  const [engineStatus, setEngineStatus] = useState<OCREngineStatus>(() => getOCRStatus().status);
+  const [engineStatus, setEngineStatus] = useState<"idle" | "loading" | "ready" | "error">(() => getOCRStatus().status);
   const [engineProgress, setEngineProgress] = useState(() => getOCRStatus().progress);
   const [engineStatusText, setEngineStatusText] = useState(() => getOCRStatus().statusText);
 
