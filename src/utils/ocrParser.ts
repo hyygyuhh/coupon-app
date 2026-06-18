@@ -560,6 +560,7 @@ function stripOcrNoise(line: string): string {
 /**
  * 判断一行是否像"券卡标题行"
  * 规则：必须包含金额信号或券/红包关键字 + 中文名称
+ * 排除：使用规则区域、序号列表行（如"2 本券不支持..."）
  */
 function lineLooksLikeTitle(line: string): boolean {
   if (!line || line.length < 3) return false;
@@ -569,6 +570,13 @@ function lineLooksLikeTitle(line: string): boolean {
 
   // UI 黑名单先行过滤
   if (looksLikeUI(cleaned)) return false;
+
+  // 严格排除：数字序号开头的行（使用规则常见格式）
+  // 如："2 本券不支持与其他优惠活动同享"、"3 本券不支持转赠他人"
+  if (/^\s*\d+\s+/.test(cleaned)) return false;
+
+  // 严格排除：纯序号行
+  if (/^\s*\d+\s*[、.．)）]\s*$/.test(cleaned)) return false;
 
   // 正面信号
   // 1. "38元 ..." / "0.01元..."（金额在前）
@@ -582,12 +590,17 @@ function lineLooksLikeTitle(line: string): boolean {
   // 5. 含 ¥/￥ 或 折 + 中文
   if (/[¥￥]\s*\d+/.test(cleaned) && /[\u4e00-\u9fa5]{2,}/.test(cleaned)) return true;
   if (/\d+\s*折/.test(cleaned) && /[\u4e00-\u9fa5]{2,}/.test(cleaned)) return true;
-  // 6. 含"券/红包/补贴" + 金额数字 + 中文
+  // 6. 含"券/红包/补贴" + 金额数字 + 中文（排除序号行）
   if (/(券|红包|补贴)/.test(cleaned) && /\d/.test(cleaned) && /[\u4e00-\u9fa5]{2,}/.test(cleaned)) return true;
   // 7. 京东E卡特殊格式："京东E卡" + 金额
   if (/京东.?[Ee]卡/.test(cleaned) && /[\d.]+/.test(cleaned)) return true;
-  // 8. 免单券/免费券（无金额但有券名关键词）
-  if (/免单|免费/.test(cleaned) && /券/.test(cleaned) && /[\u4e00-\u9fa5]{3,}/.test(cleaned)) return true;
+  // 8. 免单券/免费券：必须以"券"结尾或包含"券"关键字（更严格）
+  //    排除使用规则中的"本券"等词
+  if (/免单券|免费券|免单/.test(cleaned) && /[\u4e00-\u9fa5]{3,}/.test(cleaned)) {
+    // 排除"本券不支持"等使用规则
+    if (/本券不支持|本券不得|本券仅限|本券不可/.test(cleaned)) return false;
+    return true;
+  }
   // 9. 纯券名格式（不含金额但有明确券名特征）
   if (/券$/.test(cleaned) && /[\u4e00-\u9fa5]{4,}/.test(cleaned) && !/使用|领取|查看|规则|详情|兑换/.test(cleaned)) return true;
 
@@ -607,10 +620,10 @@ export function splitCouponBlocks(rawText: string): string[] {
   const ruleStartIndices: number[] = [];
   const ruleEndIndices: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/使用规则|适用门店|适用商品|使用渠道|使用场景|使用时段|使用门槛/.test(lines[i])) {
+    if (/使用规则|适用门店|适用商品|使用渠道|使用场景|使用时段|使用门槛|使用条件/.test(lines[i])) {
       ruleStartIndices.push(i);
     }
-    if (/券有效期|使用说明|温馨提示|活动说明|优惠券说明/.test(lines[i])) {
+    if (/券有效期|使用说明|温馨提示|活动说明|优惠券说明|活动规则|活动条款/.test(lines[i])) {
       ruleEndIndices.push(i);
     }
   }
@@ -625,6 +638,27 @@ export function splitCouponBlocks(rawText: string): string[] {
     return false;
   };
 
+  // 判断某一行是否是使用规则相关的行（更严格的判断）
+  const isRuleLine = (line: string): boolean => {
+    if (!line) return false;
+    // 规则区域内的行
+    for (let i = 0; i < ruleStartIndices.length; i++) {
+      const start = ruleStartIndices[i];
+      const end = i < ruleEndIndices.length ? ruleEndIndices[i] : lines.length;
+      const idx = lines.indexOf(line);
+      if (idx >= start && idx <= end) return true;
+    }
+    // 使用规则关键词
+    if (/使用规则|适用门店|适用商品|使用渠道|使用场景|使用时段|使用门槛|使用条件/.test(line)) return true;
+    // 使用规则中的常见否定表述
+    if (/本券不支持|本券不得|本券仅限|本券不可|不得擅自|不得以/.test(line)) return true;
+    // 纯序号开头的行（使用规则常见格式）
+    if (/^\s*\d+\s+/.test(line)) return true;
+    // "优惠券来源"等非券标题行
+    if (/优惠券来源|活动来源/.test(line)) return true;
+    return false;
+  };
+
   // 步骤 1：找"像券卡标题"的行
   const anchors: number[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -632,10 +666,11 @@ export function splitCouponBlocks(rawText: string): string[] {
   }
 
   // 步骤 2：如果没有标题锚点，找包含日期 + 平台关键词的行作为锚点
-  // 但排除使用规则区域内的行
+  // 但排除使用规则区域内的行和规则相关行
   if (anchors.length === 0) {
     for (let i = 0; i < lines.length; i++) {
       if (isInRuleSection(i)) continue;
+      if (isRuleLine(lines[i])) continue;
       const hasDate = /\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}|(\d{1,2})[月/](\d{1,2})/.test(lines[i]);
       const hasPlatform = PLATFORM_KEYWORDS.some((kw) => kw.pattern.test(lines[i]));
       if (hasDate || hasPlatform) anchors.push(i);
@@ -692,6 +727,10 @@ export function parseMultipleCoupons(rawText: string): CouponCandidate[] {
     const hasAmount = !!parsed.amount;
     const hasDate = !!parsed.expiryDate;
     const hasGoodName = !!parsed.name && isGoodName(parsed.name);
+
+    // 严格排除：使用规则块（即使通过了上面的门槛）
+    const isRuleBlock = /使用规则|适用门店|适用商品|使用渠道|使用场景|使用时段|使用门槛|使用条件|本券不支持|本券不得|本券仅限|本券不可|优惠券来源/.test(rawBlock);
+    if (isRuleBlock) continue;
 
     if (!(hasAmount || hasDate || hasGoodName)) continue;
 
