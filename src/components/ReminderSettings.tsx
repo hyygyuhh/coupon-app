@@ -917,6 +917,10 @@ export default function ReminderSettings() {
               <li>创建应用，获取 API Key 和 Secret Key</li>
               <li>新用户有 5万次/天的免费额度</li>
             </ol>
+            <div className="mt-3 pt-3 border-t border-accent-green/20 text-xs text-accent-green/80">
+              ⚠️ 百度 OCR 的接口不带浏览器跨域响应头，直接在页面中调用可能被拦截。
+              本应用已做处理：一旦云端不可用，会自动切回本地识别继续使用。
+            </div>
           </div>
         )}
       </div>

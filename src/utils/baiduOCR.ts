@@ -3,7 +3,24 @@ import { getOCRConfig } from "./ocrConfig";
 /**
  * 百度 OCR API 调用
  * 文档: https://cloud.baidu.com/doc/OCR/index.html
+ *
+ * 注意：百度 OCR API 响应未带 CORS 头，浏览器直接 fetch 会被拦截
+ * 并抛出 "Failed to fetch" 错误。目前的处理方式：
+ *   1. 在本文件中检测 CORS / 网络错误，抛出带有 "CORS_BLOCKED" 标记的错误
+ *   2. 在 ocrService.ts 中 catch 后自动降级为本地 Tesseract.js OCR
+ *   3. 用户无需手动切换，页面会自动回退
  */
+
+// 判断错误是否来自浏览器的跨域/网络拦截
+function isCorsError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("typeerror")
+  );
+}
 
 // 获取 Access Token
 async function getAccessToken(apiKey: string, secretKey: string): Promise<string> {
@@ -14,9 +31,19 @@ async function getAccessToken(apiKey: string, secretKey: string): Promise<string
     client_secret: secretKey,
   });
 
-  const response = await fetch(`${tokenUrl}?${params}`, {
-    method: "POST",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${tokenUrl}?${params}`, {
+      method: "POST",
+    });
+  } catch (err) {
+    if (isCorsError(err)) {
+      throw new Error(
+        "CORS_BLOCKED: 浏览器无法直接调用百度 OCR API（跨域限制），将自动切换到本地识别"
+      );
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     throw new Error(`获取 Access Token 失败: ${response.status}`);
@@ -39,10 +66,20 @@ async function basicGeneral(imageDataUrl: string, accessToken: string): Promise<
   const formData = new FormData();
   formData.append("image", base64Data);
 
-  const response = await fetch(`${apiUrl}?access_token=${accessToken}`, {
-    method: "POST",
-    body: formData,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}?access_token=${accessToken}`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (err) {
+    if (isCorsError(err)) {
+      throw new Error(
+        "CORS_BLOCKED: 浏览器无法直接调用百度 OCR API（跨域限制），将自动切换到本地识别"
+      );
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     throw new Error(`百度 OCR 请求失败: ${response.status}`);
@@ -97,4 +134,18 @@ export async function recognizeWithBaidu(imageDataUrl: string): Promise<string> 
   );
 
   return await basicGeneral(imageDataUrl, token);
+}
+
+/**
+ * 判断错误消息是否为 CORS / 网络拦截错误，
+ * 供上层服务判断是否需要降级到本地 OCR。
+ */
+export function isBaiduCorsError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message || "";
+  return (
+    msg.startsWith("CORS_BLOCKED") ||
+    /failed to fetch/i.test(msg) ||
+    /networkerror/i.test(msg)
+  );
 }

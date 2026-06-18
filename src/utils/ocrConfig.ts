@@ -12,11 +12,18 @@ export function getOCRConfig(): OCRConfig {
   const stored = localStorage.getItem(OCR_CONFIG_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // 兼容旧数据
+      return {
+        engine: parsed.engine === "baidu" ? "baidu" : "local",
+        baiduApiKey: parsed.baiduApiKey || "",
+        baiduSecretKey: parsed.baiduSecretKey || "",
+      };
     } catch {
       // ignore
     }
   }
+  // 默认使用本地 OCR，避免浏览器 CORS 直接阻断识别
   return {
     engine: "local",
     baiduApiKey: "",
