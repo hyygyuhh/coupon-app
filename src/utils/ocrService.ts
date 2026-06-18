@@ -171,55 +171,79 @@ const STRATEGY_LABELS = [
 
 /**
  * 获取或创建 Worker（单例）
- * 使用 jsDelivr CDN 加速语言包下载
+ * 添加超时和重试机制
  */
 async function getWorker(): Promise<Worker> {
   if (workerPromise) return workerPromise;
 
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 60000;
+
   workerPromise = (async () => {
-    engineStatus = "loading";
-    engineProgress = 0;
-    engineStatusText = "正在加载识别引擎";
-    notifyStatusChange();
-
-    console.log("[OCR] 初始化 Worker...");
-    const start = performance.now();
-    
-    const worker = await createWorker("chi_sim+eng", 1, {
-      // 所有文件从本地加载（避免 CDN 被墙或速度慢）
-      // 使用 wasm.js 版本避免额外的 wasm 文件请求
-      workerPath: `${window.location.origin}/coupon-app/worker.min.js`,
-      corePath: `${window.location.origin}/coupon-app/tesseract-core.wasm.js`,
-      langPath: `${window.location.origin}/coupon-app/tessdata`,
-      logger: (m) => {
-        if (m.status === "loading tesseract core") {
-          engineStatusText = "正在加载识别引擎";
-          engineProgress = 0.1;
-        } else if (m.status === "initializing tesseract") {
-          engineStatusText = "正在初始化引擎";
-          engineProgress = 0.2;
-        } else if (m.status === "loading language traineddata") {
-          engineStatusText = `正在下载语言包 ${Math.round(m.progress * 100)}%`;
-          engineProgress = 0.2 + m.progress * 0.6;
-        } else if (m.status === "initializing api") {
-          engineStatusText = "正在加载字库";
-          engineProgress = 0.85;
-        } else if (m.status === "recognizing text") {
-          engineStatusText = "正在识别文字";
-        }
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        engineStatus = "loading";
+        engineProgress = 0;
+        engineStatusText = attempt > 1 ? "重试加载识别引擎..." : "正在加载识别引擎";
         notifyStatusChange();
-      },
-    });
 
-    const elapsed = ((performance.now() - start) / 1000).toFixed(1);
-    console.log(`[OCR] Worker 初始化完成 (${elapsed}s)`);
-    
-    engineStatus = "ready";
-    engineProgress = 1;
-    engineStatusText = "识别引擎已就绪";
-    notifyStatusChange();
-    
-    return worker;
+        console.log(`[OCR] 初始化 Worker (尝试 ${attempt}/${MAX_RETRIES})...`);
+        const start = performance.now();
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("OCR 引擎加载超时")), TIMEOUT_MS)
+        );
+
+        const workerPromise = createWorker("chi_sim", 1, {
+          workerPath: `${window.location.origin}/coupon-app/worker.min.js`,
+          corePath: `${window.location.origin}/coupon-app/tesseract-core.wasm.js`,
+          langPath: `${window.location.origin}/coupon-app/tessdata`,
+          logger: (m) => {
+            if (m.status === "loading tesseract core") {
+              engineStatusText = "正在加载识别引擎";
+              engineProgress = 0.1;
+            } else if (m.status === "initializing tesseract") {
+              engineStatusText = "正在初始化引擎";
+              engineProgress = 0.2;
+            } else if (m.status === "loading language traineddata") {
+              engineStatusText = `正在下载语言包 ${Math.round(m.progress * 100)}%`;
+              engineProgress = 0.2 + m.progress * 0.6;
+            } else if (m.status === "initializing api") {
+              engineStatusText = "正在加载字库";
+              engineProgress = 0.85;
+            } else if (m.status === "recognizing text") {
+              engineStatusText = "正在识别文字";
+            }
+            notifyStatusChange();
+          },
+        });
+
+        const worker = await Promise.race([workerPromise, timeoutPromise]);
+
+        const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+        console.log(`[OCR] Worker 初始化完成 (${elapsed}s)`);
+
+        engineStatus = "ready";
+        engineProgress = 1;
+        engineStatusText = "识别引擎已就绪";
+        notifyStatusChange();
+
+        return worker;
+      } catch (error) {
+        console.error(`[OCR] Worker 初始化失败 (尝试 ${attempt}/${MAX_RETRIES}):`, error);
+        if (attempt < MAX_RETRIES) {
+          engineStatusText = "加载失败，正在重试...";
+          notifyStatusChange();
+          await new Promise((r) => setTimeout(r, 2000));
+        } else {
+          engineStatus = "error";
+          engineStatusText = "加载失败，请检查网络或稍后重试";
+          notifyStatusChange();
+          throw error;
+        }
+      }
+    }
+    throw new Error("所有重试均失败");
   })();
 
   return workerPromise;
