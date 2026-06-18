@@ -586,6 +586,10 @@ function lineLooksLikeTitle(line: string): boolean {
   if (/(券|红包|补贴)/.test(cleaned) && /\d/.test(cleaned) && /[\u4e00-\u9fa5]{2,}/.test(cleaned)) return true;
   // 7. 京东E卡特殊格式："京东E卡" + 金额
   if (/京东.?[Ee]卡/.test(cleaned) && /[\d.]+/.test(cleaned)) return true;
+  // 8. 免单券/免费券（无金额但有券名关键词）
+  if (/免单|免费/.test(cleaned) && /券/.test(cleaned) && /[\u4e00-\u9fa5]{3,}/.test(cleaned)) return true;
+  // 9. 纯券名格式（不含金额但有明确券名特征）
+  if (/券$/.test(cleaned) && /[\u4e00-\u9fa5]{4,}/.test(cleaned) && !/使用|领取|查看|规则|详情|兑换/.test(cleaned)) return true;
 
   return false;
 }
@@ -598,6 +602,29 @@ export function splitCouponBlocks(rawText: string): string[] {
   const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l);
   if (lines.length <= 2) return [rawText];
 
+  // 识别使用规则区域（从"使用规则"开始到"券有效期"/"使用说明"结束）
+  // 这些区域的行不应该作为锚点，因为它们包含日期和平台信息但不是券标题
+  const ruleStartIndices: number[] = [];
+  const ruleEndIndices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/使用规则|适用门店|适用商品|使用渠道|使用场景|使用时段|使用门槛/.test(lines[i])) {
+      ruleStartIndices.push(i);
+    }
+    if (/券有效期|使用说明|温馨提示|活动说明|优惠券说明/.test(lines[i])) {
+      ruleEndIndices.push(i);
+    }
+  }
+
+  // 判断某一行是否在使用规则区域内
+  const isInRuleSection = (index: number): boolean => {
+    for (let i = 0; i < ruleStartIndices.length; i++) {
+      const start = ruleStartIndices[i];
+      const end = i < ruleEndIndices.length ? ruleEndIndices[i] : lines.length;
+      if (index >= start && index <= end) return true;
+    }
+    return false;
+  };
+
   // 步骤 1：找"像券卡标题"的行
   const anchors: number[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -605,8 +632,10 @@ export function splitCouponBlocks(rawText: string): string[] {
   }
 
   // 步骤 2：如果没有标题锚点，找包含日期 + 平台关键词的行作为锚点
+  // 但排除使用规则区域内的行
   if (anchors.length === 0) {
     for (let i = 0; i < lines.length; i++) {
+      if (isInRuleSection(i)) continue;
       const hasDate = /\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}|(\d{1,2})[月/](\d{1,2})/.test(lines[i]);
       const hasPlatform = PLATFORM_KEYWORDS.some((kw) => kw.pattern.test(lines[i]));
       if (hasDate || hasPlatform) anchors.push(i);
