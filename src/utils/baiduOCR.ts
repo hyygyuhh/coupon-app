@@ -1,25 +1,49 @@
 import { getOCRConfig } from "./ocrConfig";
 
 /**
- * 百度 OCR API 调用
- * 文档: https://cloud.baidu.com/doc/OCR/index.html
+ * 百度 OCR API 调用（通过 CORS 代理）
  *
- * 注意：百度 OCR API 响应未带 CORS 头，浏览器直接 fetch 会被拦截
- * 并抛出 "Failed to fetch" 错误。目前的处理方式：
- *   1. 在本文件中检测 CORS / 网络错误，抛出带有 "CORS_BLOCKED" 标记的错误
- *   2. 在 ocrService.ts 中 catch 后自动降级为本地 Tesseract.js OCR
- *   3. 用户无需手动切换，页面会自动回退
+ * 方案：使用 https://corsproxy.io/ 作为代理，
+ * 将请求转发到百度 OCR API 并添加 CORS 响应头。
+ * 格式：https://corsproxy.io/?[params]=百度接口地址
+ *
+ * 备选代理列表（如果主代理不可用会自动切换）：
+ *   - https://corsproxy.io/
+ *   - https://api.allorigins.win/raw?url=
  */
 
-// 判断错误是否来自浏览器的跨域/网络拦截
-function isCorsError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = (err.message || "").toLowerCase();
-  return (
-    msg.includes("failed to fetch") ||
-    msg.includes("networkerror") ||
-    msg.includes("typeerror")
-  );
+const PROXY_LIST = [
+  "https://corsproxy.io",
+  "https://api.allorigins.win/raw?url=",
+];
+
+// 当前使用的代理索引（失败时切换）
+let proxyIndex = 0;
+
+function getProxy(): string {
+  return PROXY_LIST[proxyIndex];
+}
+
+function getProxiedUrl(targetUrl: string): string {
+  const proxy = getProxy();
+  if (proxy.includes("allorigins")) {
+    return `${proxy}${encodeURIComponent(targetUrl)}`;
+  }
+  return `${proxy}/?url=${encodeURIComponent(targetUrl)}`;
+}
+
+// 切换到下一个代理
+function rotateProxy(): boolean {
+  if (proxyIndex < PROXY_LIST.length - 1) {
+    proxyIndex++;
+    return true;
+  }
+  return false;
+}
+
+// 重置代理（每次新请求从头尝试）
+function resetProxy(): void {
+  proxyIndex = 0;
 }
 
 // 获取 Access Token
@@ -31,69 +55,115 @@ async function getAccessToken(apiKey: string, secretKey: string): Promise<string
     client_secret: secretKey,
   });
 
-  let response: Response;
-  try {
-    response = await fetch(`${tokenUrl}?${params}`, {
-      method: "POST",
-    });
-  } catch (err) {
-    if (isCorsError(err)) {
-      throw new Error(
-        "CORS_BLOCKED: 浏览器无法直接调用百度 OCR API（跨域限制），将自动切换到本地识别"
-      );
+  const targetUrl = `${tokenUrl}?${params}`;
+
+  let lastError: Error | null = null;
+
+  // 尝试所有代理
+  for (let attempt = 0; attempt < PROXY_LIST.length; attempt++) {
+    resetProxy();
+    for (let i = 0; i < PROXY_LIST.length; i++) {
+      try {
+        const proxyUrl = getProxiedUrl(targetUrl);
+        console.log(`[百度 OCR] 通过代理获取 Token: ${proxyUrl.slice(0, 60)}...`);
+
+        const response = await fetch(proxyUrl, { method: "GET" });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(`代理返回 ${response.status}: ${text.slice(0, 100)}`);
+        }
+
+        const data = await response.json();
+
+        if (data.access_token) {
+          console.log("[百度 OCR] Token 获取成功");
+          return data.access_token;
+        }
+        throw new Error(data.error_description || "获取 Access Token 失败");
+      } catch (err) {
+        console.warn(`[百度 OCR] 代理 ${i + 1} 失败:`, err);
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (rotateProxy()) {
+          // 切换到下一个代理重试
+          continue;
+        }
+        break;
+      }
     }
-    throw err;
+    // 所有代理都失败后，尝试无代理（部分网络可能可以直连）
+    try {
+      console.log("[百度 OCR] 尝试直连...");
+      const response = await fetch(targetUrl, { method: "GET" });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.access_token) return data.access_token;
+      }
+    } catch {
+      // 直连也失败，忽略
+    }
   }
 
-  if (!response.ok) {
-    throw new Error(`获取 Access Token 失败: ${response.status}`);
-  }
-
-  const data = await response.json();
-  if (data.access_token) {
-    return data.access_token;
-  }
-  throw new Error(data.error_description || "获取 Access Token 失败");
+  throw lastError || new Error("所有代理均不可用");
 }
 
 // 通用文字识别（基础版）
 async function basicGeneral(imageDataUrl: string, accessToken: string): Promise<string> {
   const apiUrl = "https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic";
 
-  // 提取 base64 数据
+  // 提取 base64 数据（去掉 data:image/...;base64, 前缀）
   const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
 
-  const formData = new FormData();
-  formData.append("image", base64Data);
+  // 百度 OCR 接收 base64 字符串作为 image 参数
+  const params = new URLSearchParams({ image: base64Data });
+  const targetUrl = `${apiUrl}?access_token=${accessToken}`;
 
-  let response: Response;
-  try {
-    response = await fetch(`${apiUrl}?access_token=${accessToken}`, {
-      method: "POST",
-      body: formData,
-    });
-  } catch (err) {
-    if (isCorsError(err)) {
-      throw new Error(
-        "CORS_BLOCKED: 浏览器无法直接调用百度 OCR API（跨域限制），将自动切换到本地识别"
-      );
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < PROXY_LIST.length + 1; attempt++) {
+    resetProxy();
+    for (let i = 0; i < PROXY_LIST.length; i++) {
+      try {
+        const proxyUrl = getProxiedUrl(targetUrl);
+
+        const formData = new FormData();
+        formData.append("image", base64Data);
+
+        console.log(`[百度 OCR] 通过代理识别... (代理 ${i + 1})`);
+        const response = await fetch(proxyUrl, {
+          method: "POST",
+          body: params,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(`代理返回 ${response.status}: ${text.slice(0, 100)}`);
+        }
+
+        const data = await response.json();
+
+        if (data.error_code) {
+          throw new Error(data.error_msg || `百度 OCR 错误: ${data.error_code}`);
+        }
+
+        // 提取文字
+        const words = (data.words_result || []).map((item: { words: string }) => item.words);
+        return words.join("\n");
+      } catch (err) {
+        console.warn(`[百度 OCR] 代理 ${i + 1} 失败:`, err);
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (rotateProxy()) {
+          continue;
+        }
+        break;
+      }
     }
-    throw err;
   }
 
-  if (!response.ok) {
-    throw new Error(`百度 OCR 请求失败: ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  if (data.error_code) {
-    throw new Error(data.error_msg || "百度 OCR 识别失败");
-  }
-
-  // 提取文字
-  const words = (data.words_result || []).map((item: { words: string }) => item.words);
-  return words.join("\n");
+  throw lastError || new Error("所有代理均不可用");
 }
 
 // 识别图片并返回文字
@@ -106,7 +176,7 @@ export async function recognizeWithBaidu(imageDataUrl: string): Promise<string> 
 
   console.log("[百度 OCR] 开始识别...");
 
-  // 获取 Access Token（有效期 30 天，可以缓存）
+  // 获取 Access Token（有效期 30 天，缓存）
   const cacheKey = "baidu_ocr_token";
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
@@ -137,15 +207,15 @@ export async function recognizeWithBaidu(imageDataUrl: string): Promise<string> 
 }
 
 /**
- * 判断错误消息是否为 CORS / 网络拦截错误，
- * 供上层服务判断是否需要降级到本地 OCR。
+ * 判断错误是否来自 CORS / 网络拦截（保持向后兼容）
  */
 export function isBaiduCorsError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message || "";
   return (
-    msg.startsWith("CORS_BLOCKED") ||
+    msg.includes("CORS_BLOCKED") ||
     /failed to fetch/i.test(msg) ||
-    /networkerror/i.test(msg)
+    /networkerror/i.test(msg) ||
+    msg.includes("代理返回")
   );
 }

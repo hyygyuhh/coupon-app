@@ -469,7 +469,7 @@ export async function recognizeImage(
 }
 
 /**
- * 云端 OCR 识别 —— 遇到跨域/网络错误时自动降级到本地 OCR
+ * 云端 OCR 识别（通过 CORS 代理）
  */
 async function recognizeWithCloudOCR(
   file: File,
@@ -496,28 +496,25 @@ async function recognizeWithCloudOCR(
 
     const result: OCRResult = {
       text: text || "",
-      confidence: 95, // 云端 OCR 默认高置信度
+      confidence: 95,
       rounds: [{ mode: "百度云 OCR", text, confidence: 95, width: 0 }],
     };
 
     setCachedResult(file, result);
     return result;
   } catch (error: any) {
-    console.warn("[OCR] 云端识别失败，尝试降级到本地识别:", error?.message || error);
+    console.warn("[OCR] 云端识别失败，降级到本地识别:", error?.message || error);
 
-    // 如果是 CORS / 网络类错误，自动降级到本地 Tesseract.js
+    // 云端失败（包括 CORS 代理不可用时）降级到本地 Tesseract.js
     if (isBaiduCorsError(error)) {
       onProgress?.(0.35, "云端受限，自动切换到本地识别…");
-      return recognizeWithLocalOCR(file, onProgress);
+    } else {
+      onProgress?.(0.35, "云端不可用，自动切换到本地识别…");
     }
-
-    // 其他错误（例如 API Key 无效），也尝试降级一次，不让用户彻底卡住
-    onProgress?.(0.35, "云端不可用，自动切换到本地识别…");
     try {
       return await recognizeWithLocalOCR(file, onProgress);
     } catch {
-      // 都失败时，再抛出原始云端错误
-      onProgress?.(0, `识别失败: ${error.message}`);
+      onProgress?.(0, `识别失败: ${error?.message}`);
       throw error;
     }
   }
