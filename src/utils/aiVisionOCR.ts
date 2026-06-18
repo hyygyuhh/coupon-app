@@ -13,7 +13,7 @@
 
 import type { CouponInput } from "../types/coupon";
 
-export type AIVisionProvider = "openai" | "anthropic" | "google" | "deepseek";
+export type AIVisionProvider = "openai" | "anthropic" | "google" | "deepseek" | "kimi";
 
 export interface AIVisionConfig {
   provider: AIVisionProvider;
@@ -249,7 +249,7 @@ async function callDeepSeek(
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify({
-      model: "deepseek-chat", // DeepSeek 的视觉模型
+      model: "deepseek-chat",
       messages: [
         {
           role: "system",
@@ -277,6 +277,66 @@ async function callDeepSeek(
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`DeepSeek API 错误: ${response.status} - ${error}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+
+  return parseAIResponse(content);
+}
+
+/**
+ * 调用 Kimi (Moonshot)
+ * API: https://agentrs.jd.com/api/saas/openai-u/v1/chat/completions
+ */
+async function callKimi(
+  imageDataUrl: string,
+  config: AIVisionConfig
+): Promise<AIVisionResult> {
+  const baseURL = config.baseURL || "https://agentrs.jd.com/api/saas/openai-u/v1";
+
+  // 提取 base64 数据
+  const match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!match) throw new Error("无效的图片数据");
+  const [, imageFormat, base64Data] = match;
+
+  const response = await fetch(`${baseURL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json;charset=UTF-8",
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "Kimi-K2.6",
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/${imageFormat};base64,${base64Data}`,
+              },
+            },
+            {
+              type: "text",
+              text: "请识别这张优惠券图片，返回 JSON 格式结果。",
+            },
+          ],
+        },
+      ],
+      max_tokens: 2000,
+      temperature: 0.5,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Kimi API 错误: ${response.status} - ${error}`);
   }
 
   const data = await response.json();
@@ -373,6 +433,9 @@ export async function recognizeWithAIVision(
         break;
       case "deepseek":
         result = await callDeepSeek(imageDataUrl, config);
+        break;
+      case "kimi":
+        result = await callKimi(imageDataUrl, config);
         break;
       default:
         throw new Error(`不支持的 AI 服务商: ${config.provider}`);

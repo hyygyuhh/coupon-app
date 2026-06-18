@@ -78,6 +78,7 @@ function AIVisionSettings() {
             { id: "openai", name: "OpenAI", desc: "GPT-4o" },
             { id: "anthropic", name: "Anthropic", desc: "Claude 3.5" },
             { id: "google", name: "Google", desc: "Gemini" },
+            { id: "kimi", name: "Kimi", desc: "K2.6" },
             { id: "deepseek", name: "DeepSeek", desc: "国产" },
           ].map((p) => (
             <button
