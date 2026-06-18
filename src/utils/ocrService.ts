@@ -186,8 +186,10 @@ async function getWorker(): Promise<Worker> {
     const start = performance.now();
     
     const worker = await createWorker("chi_sim+eng", 1, {
-      // 语言包从本地加载（避免 CDN 被墙导致下载失败）
-      // 文件在 public/tessdata/ 目录，构建后会自动部署
+      // 所有文件从本地加载（避免 CDN 被墙或速度慢）
+      // 使用 wasm.js 版本避免额外的 wasm 文件请求
+      workerPath: `${window.location.origin}/coupon-app/worker.min.js`,
+      corePath: `${window.location.origin}/coupon-app/tesseract-core.wasm.js`,
       langPath: `${window.location.origin}/coupon-app/tessdata`,
       logger: (m) => {
         if (m.status === "loading tesseract core") {
