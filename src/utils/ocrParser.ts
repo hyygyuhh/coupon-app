@@ -42,6 +42,11 @@ const PLATFORM_KEYWORDS: PlatformKeyword[] = [
   { pattern: /古茗/, name: "古茗", priority: 2 },
   { pattern: /一点点/, name: "一点点", priority: 2 },
   { pattern: /全家|family mart|Family Mart|FamilyMart/, name: "全家", priority: 2 },
+  { pattern: /东方墨蘭|东方墨兰/, name: "东方墨蘭", priority: 1 },
+  { pattern: /书亦烧仙草|书亦/, name: "书亦烧仙草", priority: 2 },
+  { pattern: /益禾堂/, name: "益禾堂", priority: 2 },
+  { pattern: /茶百道|茶百/, name: "茶百道", priority: 2 },
+  { pattern: /茶颜悦色|茶颜/, name: "茶颜悦色", priority: 1 },
 
   // 电商类
   { pattern: /淘宝|天猫|TMALL|Tmall|tmall/, name: "淘宝/天猫", priority: 2 },
@@ -99,7 +104,8 @@ function extractExpiryDate(text: string): string | undefined {
 
   // 特殊处理：有效期范围格式 "2026.04.26-2029.04.26有效"
   // 这种格式中，第二个日期是到期日期
-  const dateRangePattern = /(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?\s*[-~—–]\s*(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?\s*(有效|到期)/;
+  // 增强：支持带时间的格式 "2026-06-19 00:00:00至2026-06-21 23:59:59有效"
+  const dateRangePattern = /(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?(?:\s+\d{1,2}:\d{2}:\d{2})?\s*[-~—–至]\s*(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?(?:\s+\d{1,2}:\d{2}:\d{2})?\s*(有效|到期|使用)/;
   const rangeMatch = text.match(dateRangePattern);
   if (rangeMatch) {
     const y = parseInt(rangeMatch[4], 10);
@@ -128,7 +134,8 @@ function extractExpiryDate(text: string): string | undefined {
 
   // 2. 全文中明确带年的日期（高置信度）
   //    格式：2026-06-15 / 2026.06.15 / 2026/06/15 / 2026年6月15日
-  const fullDatePattern = /(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?/g;
+  //    增强：支持带时间的格式
+  const fullDatePattern = /(20\d{2})[-\/\.年](\d{1,2})[-\/\.月](\d{1,2})(?:日|号)?(?:\s+\d{1,2}:\d{2}:\d{2})?/g;
   let fm;
   while ((fm = fullDatePattern.exec(text)) !== null) {
     const y = parseInt(fm[1], 10);
@@ -213,11 +220,19 @@ function extractExpiryDate(text: string): string | undefined {
  * - 立减20 / 立减20元
  * - 5折 / 9.5折 / 85折
  * - 减至9.9元 / 0.01元兑换券
+ * - 免单券 / 免费券（无金额但有免单关键词）
  */
 function extractAmount(text: string): string | undefined {
   if (!text) return undefined;
 
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  // 免单券特殊处理
+  for (const line of lines) {
+    if (/免单|免费|免费券|免费使用/.test(line)) {
+      return "免单";
+    }
+  }
 
   // 策略 A：优先找独立的 "X元" 或 "¥X" 或 "X元XXX券"
   //        这是优惠券最典型的呈现方式
@@ -369,7 +384,7 @@ function cleanName(raw: string): string {
  * 2. "减至X元 YYYYY..." 或 "立减X元 YYYYY..."
  * 3. "YYYYY X元券" / "YYYYY X元红包" 样式
  * 4. 含 "券/红包/补贴" + 金额信号的行
- * 5. 含 "新人专享/限时特惠" 等关键词的行
+ * 5. 含 "新人专享/限时特惠/免单" 等关键词的行
  * 6. 兜底：根据平台 + 金额生成
  */
 function extractName(text: string, platformHint?: string, amountHint?: string): string | undefined {
@@ -406,19 +421,26 @@ function extractName(text: string, platformHint?: string, amountHint?: string): 
       const candidate = cleanName(line);
       if (isGoodName(candidate)) return candidate;
     }
+
+    // 5. 免单券/免费券（不含金额数字）
+    const m5 = line.match(/^[\u4e00-\u9fa5]{2,}\s*(?:免单|免费)\s*(?:券)?$/);
+    if (m5) {
+      const candidate = cleanName(line);
+      if (isGoodName(candidate)) return candidate;
+    }
   }
 
   // 策略 5：含"券/红包/补贴" + 有中文信息的行
   for (const line of lines) {
-    if (/(券|红包|补贴)/.test(line)) {
+    if (/(券|红包|补贴|免单|免费)/.test(line)) {
       const cleaned = cleanName(line);
       if (isGoodName(cleaned)) return cleaned;
     }
   }
 
-  // 策略 6：含"新人专享/限时特惠/通用券"等强信号的行
+  // 策略 6：含"新人专享/限时特惠/通用券/免单"等强信号的行
   for (const line of lines) {
-    if (/(新人专享|限时特惠|通用券|限时|限时使用|立即兑换|限时领取)/.test(line)) {
+    if (/(新人专享|限时特惠|通用券|限时|限时使用|立即兑换|限时领取|免单|免费)/.test(line)) {
       const cleaned = cleanName(line);
       if (isGoodName(cleaned)) return cleaned;
     }
