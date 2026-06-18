@@ -439,11 +439,9 @@ function isValidTextLine(line: string): boolean {
  * 主入口：识别图片
  * 
  * 分层策略：
- * 1. 先用轻量处理 + PSM 11 快速扫描
- * 2. 如果置信度 >= 88，直接返回（提前终止）
- * 3. 如果置信度 < 40，使用增强变体重试
- * 4. 否则继续尝试其他预处理变体和 PSM 模式
- * 5. 合并所有结果
+ * 1. 检查是否配置了云端 OCR，优先使用
+ * 2. 否则使用本地 Tesseract.js
+ * 3. 分层预处理 + 多 PSM 模式识别
  */
 export async function recognizeImage(
   file: File,
@@ -451,6 +449,7 @@ export async function recognizeImage(
 ): Promise<OCRResult> {
   onProgress?.(0, "正在读取图片");
 
+  // 检查是否有缓存
   const cached = await getCachedResult(file);
   if (cached) {
     console.log("[OCR] 使用缓存结果");
@@ -458,6 +457,65 @@ export async function recognizeImage(
     return cached;
   }
 
+  // 检查是否使用云端 OCR
+  const { getOCRConfig } = await import("./ocrConfig");
+  const ocrConfig = getOCRConfig();
+
+  if (ocrConfig.engine === "baidu" && ocrConfig.baiduApiKey && ocrConfig.baiduSecretKey) {
+    return await recognizeWithCloudOCR(file, onProgress);
+  }
+
+  return await recognizeWithLocalOCR(file, onProgress);
+}
+
+/**
+ * 云端 OCR 识别
+ */
+async function recognizeWithCloudOCR(
+  file: File,
+  onProgress?: (progress: number, status: string) => void
+): Promise<OCRResult> {
+  const { recognizeWithBaidu } = await import("./baiduOCR");
+
+  onProgress?.(0.1, "正在准备图片");
+
+  // 将文件转换为 base64
+  const reader = new FileReader();
+  const imageDataUrl = await new Promise<string>((resolve, reject) => {
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  onProgress?.(0.3, "正在调用云端识别");
+
+  try {
+    const text = await recognizeWithBaidu(imageDataUrl);
+
+    onProgress?.(1, "识别完成");
+
+    const result: OCRResult = {
+      text: text || "",
+      confidence: 95, // 云端 OCR 默认高置信度
+      rounds: [{ mode: "百度云 OCR", text, confidence: 95, width: 0 }],
+    };
+
+    setCachedResult(file, result);
+    return result;
+  } catch (error: any) {
+    console.error("[OCR] 云端识别失败:", error);
+    onProgress?.(0, `识别失败: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * 本地 Tesseract.js OCR 识别
+ */
+async function recognizeWithLocalOCR(
+  file: File,
+  onProgress?: (progress: number, status: string) => void
+): Promise<OCRResult> {
   const startTime = performance.now();
 
   // 步骤 1：并行生成图片变体（分层策略）

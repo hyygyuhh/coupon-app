@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check } from "lucide-react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check, Bot, Zap, HardDrive } from "lucide-react";
 import ToggleSwitch from "./ToggleSwitch";
 import dingtalkLogo from "../assets/dingtalk.svg";
 import feishuLogo from "../assets/feishu.svg";
@@ -21,6 +21,7 @@ import {
 } from "../utils/cloudSync";
 import { useCouponStore } from "../store/couponStore";
 import { exportAndDownload, importFromFile, type ImportResult } from "../utils/export";
+import { getOCRConfig, saveOCRConfig, type OCREngine, type OCRConfig } from "../utils/ocrConfig";
 
 function DingTalkIcon({ className = "w-10 h-10" }: { className?: string }) {
   return (
@@ -59,7 +60,10 @@ export default function ReminderSettings() {
   const [syncConfig, setSyncConfig] = useState<CloudSyncConfig>(() => getSyncConfig());
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<"success" | "error" | null>(null);
-  
+
+  // OCR 配置
+  const [ocrConfig, setOcrConfig] = useState<OCRConfig>(() => getOCRConfig());
+
   const coupons = useCouponStore((state) => state.coupons);
   const setCoupons = useCouponStore((state) => state.setCoupons);
 
@@ -253,6 +257,25 @@ export default function ReminderSettings() {
     setTestReminderResult(result ? "success" : "error");
     setTestingReminder(false);
   };
+
+  // OCR 配置处理函数
+  const handleOCREngineChange = useCallback((engine: OCREngine) => {
+    const next = { ...ocrConfig, engine };
+    setOcrConfig(next);
+    saveOCRConfig(next);
+  }, [ocrConfig]);
+
+  const handleOCRApiKeyChange = useCallback((value: string) => {
+    const next = { ...ocrConfig, baiduApiKey: value };
+    setOcrConfig(next);
+    saveOCRConfig(next);
+  }, [ocrConfig]);
+
+  const handleOCRSecretKeyChange = useCallback((value: string) => {
+    const next = { ...ocrConfig, baiduSecretKey: value };
+    setOcrConfig(next);
+    saveOCRConfig(next);
+  }, [ocrConfig]);
 
   const isDingTalk = config.type === "dingtalk";
 
@@ -797,6 +820,105 @@ export default function ReminderSettings() {
             <li>在仓库设置中添加 secrets（GH_TOKEN, GIST_ID, FEISHU_WEBHOOK 等）</li>
           </ol>
         </div>
+      </div>
+
+      {/* OCR 识别设置 */}
+      <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
+        <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
+          <Bot className="w-5 h-5 text-accent-orange" />
+          OCR 文字识别
+        </h3>
+        <p className="text-sm text-accent-inkMute mb-4">选择识别引擎，本地识别免费但较慢，云端识别速度快但需要配置 API</p>
+
+        {/* 引擎选择 */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <button
+            onClick={() => handleOCREngineChange("local")}
+            className={`relative p-4 rounded-2xl border-2 transition-all duration-200 ${
+              ocrConfig.engine === "local"
+                ? "border-accent-blue bg-accent-blue/5"
+                : "border-accent-grayLight hover:border-accent-blue/30 bg-paper"
+            }`}
+          >
+            <div className="mb-2 flex justify-center">
+              <HardDrive className={`w-10 h-10 ${ocrConfig.engine === "local" ? "text-accent-blue" : "text-accent-inkMute"}`} />
+            </div>
+            <div className="font-bold text-accent-ink">本地识别</div>
+            <div className="text-xs text-accent-inkMute mt-1">免费 · 速度较慢</div>
+            {ocrConfig.engine === "local" && (
+              <div className="absolute top-2 right-2 w-5 h-5 bg-accent-blue rounded-full flex items-center justify-center">
+                <span className="text-white text-xs">✓</span>
+              </div>
+            )}
+          </button>
+          <button
+            onClick={() => handleOCREngineChange("baidu")}
+            className={`relative p-4 rounded-2xl border-2 transition-all duration-200 ${
+              ocrConfig.engine === "baidu"
+                ? "border-accent-green bg-accent-green/5"
+                : "border-accent-grayLight hover:border-accent-green/30 bg-paper"
+            }`}
+          >
+            <div className="mb-2 flex justify-center">
+              <Zap className={`w-10 h-10 ${ocrConfig.engine === "baidu" ? "text-accent-green" : "text-accent-inkMute"}`} />
+            </div>
+            <div className="font-bold text-accent-ink">百度云 OCR</div>
+            <div className="text-xs text-accent-inkMute mt-1">快速 · 需配置 API</div>
+            {ocrConfig.engine === "baidu" && (
+              <div className="absolute top-2 right-2 w-5 h-5 bg-accent-green rounded-full flex items-center justify-center">
+                <span className="text-white text-xs">✓</span>
+              </div>
+            )}
+          </button>
+        </div>
+
+        {/* 百度 API 配置 */}
+        <div
+          className={`space-y-4 transition-all duration-300 ${
+            ocrConfig.engine === "baidu" ? "opacity-100 max-h-[300px]" : "opacity-0 max-h-0 overflow-hidden"
+          }`}
+        >
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              API Key
+            </label>
+            <input
+              type="text"
+              value={ocrConfig.baiduApiKey}
+              onChange={(e) => handleOCRApiKeyChange(e.target.value)}
+              placeholder="输入百度 OCR 的 API Key"
+              className="w-full px-4 py-3.5 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              Secret Key
+            </label>
+            <input
+              type="password"
+              value={ocrConfig.baiduSecretKey}
+              onChange={(e) => handleOCRSecretKeyChange(e.target.value)}
+              placeholder="输入百度 OCR 的 Secret Key"
+              className="w-full px-4 py-3.5 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition"
+            />
+          </div>
+        </div>
+
+        {/* 使用说明 */}
+        {ocrConfig.engine === "baidu" && (
+          <div className="mt-4 p-4 bg-green-50 rounded-xl">
+            <h4 className="font-medium text-accent-green mb-2 flex items-center gap-2">
+              <Lightbulb className="w-4 h-4" />
+              如何获取百度 OCR API？
+            </h4>
+            <ol className="text-sm text-accent-green/80 space-y-1 list-decimal list-inside">
+              <li>登录百度智能云控制台：console.baidu.com</li>
+              <li>搜索「文字识别 OCR」并开通服务</li>
+              <li>创建应用，获取 API Key 和 Secret Key</li>
+              <li>新用户有 5万次/天的免费额度</li>
+            </ol>
+          </div>
+        )}
       </div>
 
       {/* 数据备份与导入 */}
