@@ -43,18 +43,18 @@ function FeishuIcon({ className = "w-10 h-10" }: { className?: string }) {
   );
 }
 
-// Kimi AI 设置组件
-function KimiAISettings() {
+// Qwen AI 设置组件
+function QwenAISettings() {
   const [aiConfig, setAiConfig] = useState(() => getAIVisionConfig());
 
   const handleApiKeyChange = (key: string) => {
-    const next = { ...aiConfig, kimiApiKey: key };
+    const next = { ...aiConfig, qwenApiKey: key };
     setAiConfig(next);
     saveAIVisionConfig(next);
   };
 
   const handleBaseURLChange = (url: string) => {
-    const next = { ...aiConfig, kimiBaseURL: url };
+    const next = { ...aiConfig, qwenBaseURL: url };
     setAiConfig(next);
     saveAIVisionConfig(next);
   };
@@ -63,13 +63,13 @@ function KimiAISettings() {
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-accent-ink mb-2">
-          Kimi API Key
+          Qwen API Key
         </label>
         <input
           type="password"
-          value={aiConfig.kimiApiKey}
+          value={aiConfig.qwenApiKey}
           onChange={(e) => handleApiKeyChange(e.target.value)}
-          placeholder="输入 Kimi API Key"
+          placeholder="输入 Qwen API Key"
           className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
         />
       </div>
@@ -80,7 +80,7 @@ function KimiAISettings() {
         </label>
         <input
           type="text"
-          value={aiConfig.kimiBaseURL || ""}
+          value={aiConfig.qwenBaseURL || ""}
           onChange={(e) => handleBaseURLChange(e.target.value)}
           placeholder="https://agentrs.jd.com/api/saas/openai-u/v1"
           className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
@@ -90,7 +90,7 @@ function KimiAISettings() {
       <div className="p-3 bg-purple-50 rounded-xl">
         <h4 className="font-medium text-purple-600 mb-2 flex items-center gap-2 text-sm">
           <Lightbulb className="w-4 h-4" />
-          Kimi AI 识别优势
+          Qwen AI 识别优势
         </h4>
         <ul className="text-xs text-purple-600/80 space-y-1">
           <li>• 一步完成识别+解析，无需复杂规则</li>
@@ -864,11 +864,11 @@ export default function ReminderSettings() {
       <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
         <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
           <Bot className="w-5 h-5 text-accent-orange" />
-          Kimi AI 识别
+          Qwen AI 识别
         </h3>
-        <p className="text-sm text-accent-inkMute mb-4">使用 Kimi-K2.6 模型进行优惠券识别，准确率最高</p>
+        <p className="text-sm text-accent-inkMute mb-4">使用 Qwen2.5-VL-7B 模型进行优惠券识别，准确率最高</p>
 
-        <KimiAISettings />
+        <QwenAISettings />
       </div>
 
       {/* 数据备份与导入 */}

@@ -1,15 +1,15 @@
 /**
- * AI 视觉识别服务 - Kimi
+ * AI 视觉识别服务 - Qwen
  * 
- * 使用 Kimi-K2.6 模型识别优惠券图片，
+ * 使用 Qwen2.5-VL-7B 模型识别优惠券图片，
  * 一步完成 OCR 识别 + 结构化解析，准确率最高。
  */
 
 import type { CouponInput } from "../types/coupon";
 
 export interface AIVisionConfig {
-  kimiApiKey: string;
-  kimiBaseURL: string;
+  qwenApiKey: string;
+  qwenBaseURL: string;
 }
 
 const CONFIG_KEY = "ai-vision-config";
@@ -20,16 +20,16 @@ export function getAIVisionConfig(): AIVisionConfig {
     try {
       const parsed = JSON.parse(stored);
       return {
-        kimiApiKey: parsed.kimiApiKey || parsed.apiKey || "",
-        kimiBaseURL: parsed.kimiBaseURL || parsed.baseURL || "https://agentrs.jd.com/api/saas/openai-u/v1",
+        qwenApiKey: parsed.qwenApiKey || parsed.kimiApiKey || parsed.apiKey || "",
+        qwenBaseURL: parsed.qwenBaseURL || parsed.kimiBaseURL || parsed.baseURL || "https://agentrs.jd.com/api/saas/openai-u/v1",
       };
     } catch {
       // ignore
     }
   }
   return {
-    kimiApiKey: "",
-    kimiBaseURL: "https://agentrs.jd.com/api/saas/openai-u/v1",
+    qwenApiKey: "",
+    qwenBaseURL: "https://agentrs.jd.com/api/saas/openai-u/v1",
   };
 }
 
@@ -63,14 +63,14 @@ const SYSTEM_PROMPT = `你是一个优惠券识别助手。用户会发送一张
 只返回 JSON，不要其他文字。`;
 
 /**
- * 调用 Kimi (Moonshot)
+ * 调用 Qwen2.5-VL-7B
  * API: https://agentrs.jd.com/api/saas/openai-u/v1/chat/completions
  */
-async function callKimi(
+async function callQwen(
   imageDataUrl: string,
   config: AIVisionConfig
 ): Promise<AIVisionResult> {
-  const baseURL = config.kimiBaseURL || "https://agentrs.jd.com/api/saas/openai-u/v1";
+  const baseURL = config.qwenBaseURL || "https://agentrs.jd.com/api/saas/openai-u/v1";
 
   const match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!match) throw new Error("无效的图片数据");
@@ -80,10 +80,10 @@ async function callKimi(
     method: "POST",
     headers: {
       "Content-Type": "application/json;charset=UTF-8",
-      Authorization: `Bearer ${config.kimiApiKey}`,
+      Authorization: `Bearer ${config.qwenApiKey}`,
     },
     body: JSON.stringify({
-      model: "Kimi-K2.6",
+      model: "Qwen2.5-VL-7B",
       messages: [
         {
           role: "system",
@@ -112,7 +112,7 @@ async function callKimi(
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Kimi API 错误: ${response.status} - ${error}`);
+    throw new Error(`Qwen API 错误: ${response.status} - ${error}`);
   }
 
   const data = await response.json();
@@ -166,16 +166,16 @@ function parseAIResponse(content: string): AIVisionResult {
 }
 
 /**
- * 使用 Kimi AI 识别优惠券
+ * 使用 Qwen AI 识别优惠券
  */
-export async function recognizeWithKimi(
+export async function recognizeWithQwen(
   file: File,
   onProgress?: (progress: number, status: string) => void
 ): Promise<AIVisionResult> {
   const config = getAIVisionConfig();
 
-  if (!config.kimiApiKey) {
-    throw new Error("请先在设置中配置 Kimi API Key");
+  if (!config.qwenApiKey) {
+    throw new Error("请先在设置中配置 Qwen API Key");
   }
 
   onProgress?.(0.1, "正在准备图片");
@@ -187,23 +187,23 @@ export async function recognizeWithKimi(
     reader.readAsDataURL(file);
   });
 
-  onProgress?.(0.3, "正在调用 Kimi AI 识别");
+  onProgress?.(0.3, "正在调用 Qwen AI 识别");
 
   try {
-    const result = await callKimi(imageDataUrl, config);
+    const result = await callQwen(imageDataUrl, config);
     onProgress?.(1, "识别完成");
     return result;
   } catch (error: any) {
-    console.error("[Kimi AI] 识别失败:", error);
+    console.error("[Qwen AI] 识别失败:", error);
     onProgress?.(0, `识别失败: ${error.message}`);
     throw error;
   }
 }
 
 /**
- * 判断是否配置了 Kimi API Key
+ * 判断是否配置了 Qwen API Key
  */
-export function hasKimiConfig(): boolean {
+export function hasQwenConfig(): boolean {
   const config = getAIVisionConfig();
-  return !!config.kimiApiKey;
+  return !!config.qwenApiKey;
 }

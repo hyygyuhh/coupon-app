@@ -1,7 +1,7 @@
 /**
- * OCR 识别服务（Kimi AI 专用版）
+ * OCR 识别服务（Qwen AI 专用版）
  * ---------------------------------------------------------------
- * 使用 Kimi-K2.6 模型进行优惠券识别，一步完成识别+解析。
+ * 使用 Qwen2.5-VL-7B 模型进行优惠券识别，一步完成识别+解析。
  */
 
 import { hashFile } from "./crypto";
@@ -128,20 +128,20 @@ export async function recognizeImage(
     return cached;
   }
 
-  const { recognizeWithKimi, hasKimiConfig } = await import("./aiVisionOCR");
+  const { recognizeWithQwen, hasQwenConfig } = await import("./aiVisionOCR");
 
-  if (!hasKimiConfig()) {
-    throw new Error("请先在设置中配置 Kimi API Key");
+  if (!hasQwenConfig()) {
+    throw new Error("请先在设置中配置 Qwen API Key");
   }
 
   try {
-    const result = await recognizeWithKimi(file, onProgress);
+    const result = await recognizeWithQwen(file, onProgress);
 
     const ocrResult: OCRResult = {
       text: result.rawText || "",
       confidence: result.confidence,
       rounds: result.coupons.map((c, i) => ({
-        mode: `Kimi AI-${i + 1}`,
+        mode: `Qwen AI-${i + 1}`,
         text: `${c.name} ${c.amount || ""} ${c.expiryDate || ""}`.trim(),
         confidence: result.confidence,
         width: 0,
@@ -152,7 +152,7 @@ export async function recognizeImage(
     setCachedResult(file, ocrResult);
     return ocrResult;
   } catch (error: any) {
-    console.error("[OCR] Kimi AI 识别失败:", error);
+    console.error("[OCR] Qwen AI 识别失败:", error);
     throw error;
   }
 }
@@ -162,9 +162,9 @@ export function subscribeOCRStatus(fn: () => void): () => void {
 }
 
 export function getOCRStatus(): { status: "idle" | "loading" | "ready" | "error"; progress: number; statusText: string } {
-  return { status: "ready", progress: 1, statusText: "Kimi AI 已就绪" };
+  return { status: "ready", progress: 1, statusText: "Qwen AI 已就绪" };
 }
 
 export async function preloadOCR(onProgress?: (progress: number, status: string) => void): Promise<void> {
-  onProgress?.(1, "Kimi AI 已就绪");
+  onProgress?.(1, "Qwen AI 已就绪");
 }
