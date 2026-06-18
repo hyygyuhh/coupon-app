@@ -13,7 +13,7 @@ import { daysUntil } from "./utils/date";
 import { preloadOCR } from "./utils/ocrService";
 import { sendReminderIfNeeded } from "./utils/reminder";
 import { syncToCloud } from "./utils/cloudSync";
-import { REMINDER_DELAY_MS, EXPIRED_REFRESH_INTERVAL_MS, OCR_PRELOAD_DELAY_MS, SYNC_DELAY_MS } from "./utils/constants";
+import { REMINDER_DELAY_MS, EXPIRED_REFRESH_INTERVAL_MS, SYNC_DELAY_MS } from "./utils/constants";
 import { showToast } from "./components/Toast";
 
 type View = "home" | "settings";
@@ -48,12 +48,10 @@ export default function App() {
   }, [refreshExpired]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      preloadOCR((progress, status) => {
-        console.log(`OCR 预加载: ${(progress * 100).toFixed(0)}% - ${status}`);
-      });
-    }, OCR_PRELOAD_DELAY_MS);
-    return () => clearTimeout(timer);
+    // 页面加载后立即开始预加载 OCR 引擎（不延迟）
+    preloadOCR((progress, status) => {
+      console.log(`OCR 预加载: ${(progress * 100).toFixed(0)}% - ${status}`);
+    });
   }, []);
 
   useEffect(() => {

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { Camera, Check, Copy, X, AlertCircle } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Camera, Check, Copy, X, AlertCircle, Loader2 } from "lucide-react";
 import type { Coupon, CouponInput } from "../types/coupon";
-import { recognizeImage } from "../utils/ocrService";
+import { recognizeImage, subscribeOCRStatus, getOCRStatus, type OCREngineStatus } from "../utils/ocrService";
 import {
   mergeToInput,
   parseMultipleCoupons,
@@ -51,6 +51,21 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
   // 多券候选
   const [candidates, setCandidates] = useState<CouponCandidate[]>([]);
   const [activeIdx, setActiveIdx] = useState<number>(-1);
+
+  // OCR 引擎预加载状态
+  const [engineStatus, setEngineStatus] = useState<OCREngineStatus>(() => getOCRStatus().status);
+  const [engineProgress, setEngineProgress] = useState(() => getOCRStatus().progress);
+  const [engineStatusText, setEngineStatusText] = useState(() => getOCRStatus().statusText);
+
+  useEffect(() => {
+    const unsub = subscribeOCRStatus(() => {
+      const s = getOCRStatus();
+      setEngineStatus(s.status);
+      setEngineProgress(s.progress);
+      setEngineStatusText(s.statusText);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -206,17 +221,27 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
                   📷 上传截图自动识别
                 </div>
                 <div className="text-xs text-accent-inkMute dark:text-gray-400 mt-0.5 transition-colors">
-                  支持手机截图，首次使用需下载中文语言包
+                  {engineStatus === "ready"
+                    ? "识别引擎已就绪，选择图片即可识别"
+                    : engineStatus === "loading"
+                      ? "首次使用需下载语言包，请稍候…"
+                      : "支持手机截图，首次使用需下载中文语言包"}
                 </div>
               </div>
               <label
                 htmlFor="coupon-image-input"
                 className={`flex items-center gap-1.5 bg-accent-orange text-white px-4 py-2 rounded-full text-sm font-bold shadow-card hover:bg-accent-orange/90 transition active:scale-95 select-none ${
-                  ocrLoading ? "opacity-60 pointer-events-none" : "cursor-pointer"
+                  ocrLoading || engineStatus === "loading" ? "opacity-60 pointer-events-none" : "cursor-pointer"
                 }`}
               >
-                <Camera size={16} />
-                {ocrLoading ? "识别中…" : "选择图片"}
+                {ocrLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : engineStatus === "loading" ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Camera size={16} />
+                )}
+                {ocrLoading ? "识别中…" : engineStatus === "loading" ? "引擎加载中…" : "选择图片"}
               </label>
               <input
                 id="coupon-image-input"
@@ -227,7 +252,23 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
               />
             </div>
 
-            {/* 进度条 */}
+            {/* 引擎加载进度条 */}
+            {engineStatus === "loading" && !ocrLoading && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-accent-inkMute dark:text-gray-400 mb-1 transition-colors">
+                  <span>{engineStatusText}</span>
+                  <span>{Math.round(engineProgress * 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-paper dark:bg-[#1a1a2e] rounded-full overflow-hidden transition-colors">
+                  <div
+                    className="h-full bg-accent-orange/70 transition-all duration-300"
+                    style={{ width: `${Math.round(engineProgress * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 识别进度条 */}
             {ocrLoading && (
               <div className="mt-4">
                 <div className="flex justify-between text-xs text-accent-inkMute dark:text-gray-400 mb-1 transition-colors">

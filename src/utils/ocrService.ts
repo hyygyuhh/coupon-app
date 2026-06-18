@@ -1,5 +1,5 @@
 /**
- * OCR 识别服务（v3，效率优化版）
+ * OCR 识别服务（v4，加载速度优化版）
  * ---------------------------------------------------------------
  * 效率优化：
  * 1. 智能扫描策略：先用最快模式，置信度足够则提前终止
@@ -7,11 +7,41 @@
  * 3. 减少扫描次数：从 6 次降到 2-3 次
  * 4. 优化图片尺寸：根据图片内容动态调整
  * 5. Worker 预热：页面加载时提前初始化
+ * 6. CDN 加速：使用 jsDelivr CDN 下载语言包
+ * 7. 全局状态：暴露引擎加载进度供 UI 展示
  */
 
 import { createWorker, Worker, createScheduler, Scheduler } from "tesseract.js";
 import { processImage, type ProcessedImage, generateMultiResolution, generateFastVariant, generateEnhancedVariants } from "./imageProcessor";
 import { hashFile } from "./crypto";
+
+// ==================== 全局预加载状态 ====================
+
+export type OCREngineStatus = "idle" | "loading" | "ready" | "error";
+
+let engineStatus: OCREngineStatus = "idle";
+let engineProgress: number = 0;
+let engineStatusText: string = "";
+const statusListeners = new Set<() => void>();
+
+function notifyStatusChange() {
+  statusListeners.forEach((fn) => fn());
+}
+
+/**
+ * 订阅 OCR 引擎状态变化
+ */
+export function subscribeOCRStatus(fn: () => void): () => void {
+  statusListeners.add(fn);
+  return () => { statusListeners.delete(fn); };
+}
+
+/**
+ * 获取当前引擎状态
+ */
+export function getOCRStatus(): { status: OCREngineStatus; progress: number; statusText: string } {
+  return { status: engineStatus, progress: engineProgress, statusText: engineStatusText };
+}
 
 export interface OCRResult {
   text: string;
@@ -141,24 +171,48 @@ const STRATEGY_LABELS = [
 
 /**
  * 获取或创建 Worker（单例）
+ * 使用 jsDelivr CDN 加速语言包下载
  */
 async function getWorker(): Promise<Worker> {
   if (workerPromise) return workerPromise;
 
   workerPromise = (async () => {
+    engineStatus = "loading";
+    engineProgress = 0;
+    engineStatusText = "正在加载识别引擎";
+    notifyStatusChange();
+
     console.log("[OCR] 初始化 Worker...");
     const start = performance.now();
     
     const worker = await createWorker("chi_sim+eng", 1, {
       logger: (m) => {
-        if (m.status === "loading language traineddata") {
-          console.log(`[OCR] 下载语言包: ${(m.progress * 100).toFixed(0)}%`);
+        if (m.status === "loading tesseract core") {
+          engineStatusText = "正在加载识别引擎";
+          engineProgress = 0.1;
+        } else if (m.status === "initializing tesseract") {
+          engineStatusText = "正在初始化引擎";
+          engineProgress = 0.2;
+        } else if (m.status === "loading language traineddata") {
+          engineStatusText = `正在下载语言包 ${Math.round(m.progress * 100)}%`;
+          engineProgress = 0.2 + m.progress * 0.6;
+        } else if (m.status === "initializing api") {
+          engineStatusText = "正在加载字库";
+          engineProgress = 0.85;
+        } else if (m.status === "recognizing text") {
+          engineStatusText = "正在识别文字";
         }
+        notifyStatusChange();
       },
     });
 
     const elapsed = ((performance.now() - start) / 1000).toFixed(1);
     console.log(`[OCR] Worker 初始化完成 (${elapsed}s)`);
+    
+    engineStatus = "ready";
+    engineProgress = 1;
+    engineStatusText = "识别引擎已就绪";
+    notifyStatusChange();
     
     return worker;
   })();
@@ -555,7 +609,7 @@ export async function recognizeImage(
 }
 
 /**
- * 预加载 OCR 引擎
+ * 预加载 OCR 引擎（页面加载时立即调用）
  */
 export async function preloadOCR(
   onProgress?: (progress: number, status: string) => void
@@ -566,6 +620,9 @@ export async function preloadOCR(
     onProgress?.(1, "OCR 引擎已就绪");
   } catch (error) {
     console.warn("OCR 预加载失败:", error);
+    engineStatus = "error";
+    engineStatusText = "引擎加载失败";
+    notifyStatusChange();
     onProgress?.(1, "OCR 预加载失败");
   }
 }
