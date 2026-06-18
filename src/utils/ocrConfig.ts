@@ -1,4 +1,4 @@
-export type OCREngine = "local" | "baidu";
+export type OCREngine = "local" | "baidu" | "ai-vision";
 
 export interface OCRConfig {
   engine: OCREngine;
@@ -15,7 +15,7 @@ export function getOCRConfig(): OCRConfig {
       const parsed = JSON.parse(stored);
       // 兼容旧数据
       return {
-        engine: parsed.engine === "baidu" ? "baidu" : "local",
+        engine: parsed.engine === "baidu" ? "baidu" : parsed.engine === "ai-vision" ? "ai-vision" : "local",
         baiduApiKey: parsed.baiduApiKey || "",
         baiduSecretKey: parsed.baiduSecretKey || "",
       };

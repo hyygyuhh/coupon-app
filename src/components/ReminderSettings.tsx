@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check, Bot, Zap, HardDrive } from "lucide-react";
+import { Bell, BellOff, Webhook, Key, Clock, FlaskConical, Lightbulb, Settings, AlertCircle, Download, FileJson, FileText, Repeat, Cloud, CloudOff, RefreshCw, Upload, Check, Bot, Zap, HardDrive, Sparkles } from "lucide-react";
 import ToggleSwitch from "./ToggleSwitch";
 import dingtalkLogo from "../assets/dingtalk.svg";
 import feishuLogo from "../assets/feishu.svg";
@@ -22,6 +22,7 @@ import {
 import { useCouponStore } from "../store/couponStore";
 import { exportAndDownload, importFromFile, type ImportResult } from "../utils/export";
 import { getOCRConfig, saveOCRConfig, type OCREngine, type OCRConfig } from "../utils/ocrConfig";
+import { getAIVisionConfig, saveAIVisionConfig, type AIVisionProvider } from "../utils/aiVisionOCR";
 
 function DingTalkIcon({ className = "w-10 h-10" }: { className?: string }) {
   return (
@@ -40,6 +41,103 @@ function FeishuIcon({ className = "w-10 h-10" }: { className?: string }) {
       alt="Feishu"
       className={`${className} object-contain`}
     />
+  );
+}
+
+// AI 视觉识别设置组件
+function AIVisionSettings() {
+  const [aiConfig, setAiConfig] = useState(() => getAIVisionConfig());
+
+  const handleProviderChange = (provider: AIVisionProvider) => {
+    const next = { ...aiConfig, provider };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
+  const handleApiKeyChange = (key: string) => {
+    const next = { ...aiConfig, apiKey: key };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
+  const handleBaseURLChange = (url: string) => {
+    const next = { ...aiConfig, baseURL: url };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* 服务商选择 */}
+      <div>
+        <label className="block text-sm font-medium text-accent-ink mb-2">
+          AI 服务商
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { id: "openai", name: "OpenAI", desc: "GPT-4o" },
+            { id: "anthropic", name: "Anthropic", desc: "Claude 3.5" },
+            { id: "google", name: "Google", desc: "Gemini" },
+            { id: "deepseek", name: "DeepSeek", desc: "国产" },
+          ].map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handleProviderChange(p.id as AIVisionProvider)}
+              className={`p-2 rounded-xl border text-left transition-all ${
+                aiConfig.provider === p.id
+                  ? "border-purple-500 bg-purple-50"
+                  : "border-accent-grayLight hover:border-purple-300"
+              }`}
+            >
+              <div className="font-medium text-accent-ink text-sm">{p.name}</div>
+              <div className="text-xs text-accent-inkMute">{p.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* API Key */}
+      <div>
+        <label className="block text-sm font-medium text-accent-ink mb-2">
+          API Key
+        </label>
+        <input
+          type="password"
+          value={aiConfig.apiKey}
+          onChange={(e) => handleApiKeyChange(e.target.value)}
+          placeholder={aiConfig.provider === "google" ? "输入 API Key" : "输入 API Key（以 sk- 开头）"}
+          className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+        />
+      </div>
+
+      {/* 自定义 API 地址（可选） */}
+      <div>
+        <label className="block text-sm font-medium text-accent-ink mb-2">
+          自定义 API 地址 <span className="text-accent-inkMute font-normal">(可选，用于代理)</span>
+        </label>
+        <input
+          type="text"
+          value={aiConfig.baseURL || ""}
+          onChange={(e) => handleBaseURLChange(e.target.value)}
+          placeholder="如：https://api.openai-proxy.com/v1"
+          className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+        />
+      </div>
+
+      {/* 使用说明 */}
+      <div className="p-3 bg-purple-50 rounded-xl">
+        <h4 className="font-medium text-purple-600 mb-2 flex items-center gap-2 text-sm">
+          <Lightbulb className="w-4 h-4" />
+          AI 视觉识别优势
+        </h4>
+        <ul className="text-xs text-purple-600/80 space-y-1">
+          <li>• 一步完成识别+解析，无需复杂规则</li>
+          <li>• 自动区分券标题和使用规则</li>
+          <li>• 支持各种格式，准确率最高</li>
+          <li>• GPT-4o-mini 约 ¥0.01/次，成本很低</li>
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -828,10 +926,29 @@ export default function ReminderSettings() {
           <Bot className="w-5 h-5 text-accent-orange" />
           OCR 文字识别
         </h3>
-        <p className="text-sm text-accent-inkMute mb-4">选择识别引擎，本地识别免费但较慢，云端识别速度快但需要配置 API</p>
+        <p className="text-sm text-accent-inkMute mb-4">选择识别引擎。推荐使用 AI 视觉识别，准确率最高</p>
 
         {/* 引擎选择 */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <button
+            onClick={() => handleOCREngineChange("ai-vision")}
+            className={`relative p-4 rounded-2xl border-2 transition-all duration-200 ${
+              ocrConfig.engine === "ai-vision"
+                ? "border-purple-500 bg-purple-50"
+                : "border-accent-grayLight hover:border-purple-300 bg-paper"
+            }`}
+          >
+            <div className="mb-2 flex justify-center">
+              <Sparkles className={`w-10 h-10 ${ocrConfig.engine === "ai-vision" ? "text-purple-500" : "text-accent-inkMute"}`} />
+            </div>
+            <div className="font-bold text-accent-ink text-sm">AI 视觉</div>
+            <div className="text-xs text-accent-inkMute mt-1">最准确</div>
+            {ocrConfig.engine === "ai-vision" && (
+              <div className="absolute top-2 right-2 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs">✓</span>
+              </div>
+            )}
+          </button>
           <button
             onClick={() => handleOCREngineChange("local")}
             className={`relative p-4 rounded-2xl border-2 transition-all duration-200 ${
@@ -843,8 +960,8 @@ export default function ReminderSettings() {
             <div className="mb-2 flex justify-center">
               <HardDrive className={`w-10 h-10 ${ocrConfig.engine === "local" ? "text-accent-blue" : "text-accent-inkMute"}`} />
             </div>
-            <div className="font-bold text-accent-ink">本地识别</div>
-            <div className="text-xs text-accent-inkMute mt-1">免费 · 速度较慢</div>
+            <div className="font-bold text-accent-ink text-sm">本地识别</div>
+            <div className="text-xs text-accent-inkMute mt-1">免费</div>
             {ocrConfig.engine === "local" && (
               <div className="absolute top-2 right-2 w-5 h-5 bg-accent-blue rounded-full flex items-center justify-center">
                 <span className="text-white text-xs">✓</span>
@@ -862,14 +979,23 @@ export default function ReminderSettings() {
             <div className="mb-2 flex justify-center">
               <Zap className={`w-10 h-10 ${ocrConfig.engine === "baidu" ? "text-accent-green" : "text-accent-inkMute"}`} />
             </div>
-            <div className="font-bold text-accent-ink">百度云 OCR</div>
-            <div className="text-xs text-accent-inkMute mt-1">快速 · 需配置 API</div>
+            <div className="font-bold text-accent-ink text-sm">百度云</div>
+            <div className="text-xs text-accent-inkMute mt-1">快速</div>
             {ocrConfig.engine === "baidu" && (
               <div className="absolute top-2 right-2 w-5 h-5 bg-accent-green rounded-full flex items-center justify-center">
                 <span className="text-white text-xs">✓</span>
               </div>
             )}
           </button>
+        </div>
+
+        {/* AI 视觉识别配置 */}
+        <div
+          className={`space-y-4 transition-all duration-300 ${
+            ocrConfig.engine === "ai-vision" ? "opacity-100 max-h-[500px]" : "opacity-0 max-h-0 overflow-hidden"
+          }`}
+        >
+          <AIVisionSettings />
         </div>
 
         {/* 百度 API 配置 */}

@@ -52,6 +52,17 @@ export interface OCRResult {
     confidence: number;
     width: number;
   }[];
+  // AI 视觉识别直接返回的结构化数据
+  aiCoupons?: Array<{
+    name?: string;
+    platform?: string;
+    amount?: string;
+    expiryDate?: string;
+    note?: string;
+    code?: string;
+    url?: string;
+    tags?: string[];
+  }>;
 }
 
 interface OCRCacheEntry {
@@ -439,9 +450,9 @@ function isValidTextLine(line: string): boolean {
  * 主入口：识别图片
  * 
  * 分层策略：
- * 1. 检查是否配置了云端 OCR，优先使用
- * 2. 否则使用本地 Tesseract.js
- * 3. 分层预处理 + 多 PSM 模式识别
+ * 1. 检查是否配置了 AI 视觉识别，优先使用（准确率最高）
+ * 2. 否则检查是否配置了百度 OCR
+ * 3. 最后使用本地 Tesseract.js
  */
 export async function recognizeImage(
   file: File,
@@ -457,7 +468,13 @@ export async function recognizeImage(
     return cached;
   }
 
-  // 检查是否使用云端 OCR
+  // 检查是否使用 AI 视觉识别（优先级最高）
+  const { shouldUseAIVision } = await import("./aiVisionOCR");
+  if (shouldUseAIVision()) {
+    return await recognizeWithAIVisionWrapper(file, onProgress);
+  }
+
+  // 检查是否使用百度 OCR
   const { getOCRConfig } = await import("./ocrConfig");
   const ocrConfig = getOCRConfig();
 
@@ -466,6 +483,40 @@ export async function recognizeImage(
   }
 
   return await recognizeWithLocalOCR(file, onProgress);
+}
+
+/**
+ * AI 视觉识别包装器
+ */
+async function recognizeWithAIVisionWrapper(
+  file: File,
+  onProgress?: (progress: number, status: string) => void
+): Promise<OCRResult> {
+  const { recognizeWithAIVision } = await import("./aiVisionOCR");
+
+  try {
+    const result = await recognizeWithAIVision(file, onProgress);
+
+    // 转换为 OCRResult 格式
+    const ocrResult: OCRResult = {
+      text: result.rawText || "",
+      confidence: result.confidence,
+      rounds: result.coupons.map((c, i) => ({
+        mode: `AI识别-${i + 1}`,
+        text: `${c.name} ${c.amount || ""} ${c.expiryDate || ""}`.trim(),
+        confidence: result.confidence,
+        width: 0,
+      })),
+      // AI 直接返回结构化数据
+      aiCoupons: result.coupons,
+    };
+
+    return ocrResult;
+  } catch (error: any) {
+    console.warn("[OCR] AI 视觉识别失败，降级到本地识别:", error?.message);
+    onProgress?.(0.35, "AI 识别失败，自动切换到本地识别…");
+    return await recognizeWithLocalOCR(file, onProgress);
+  }
 }
 
 /**

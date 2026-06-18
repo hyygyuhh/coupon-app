@@ -152,27 +152,62 @@ export default function CouponModal({ open, coupon, onClose, onSave }: Props) {
       });
       setOcrText(result.text);
 
-      const list = parseMultipleCoupons(result.text);
-      setCandidates(list);
+      // 检查是否是 AI 视觉识别返回的结构化数据
+      if (result.aiCoupons && result.aiCoupons.length > 0) {
+        // AI 直接返回结构化数据，无需再解析
+        const aiCandidates: CouponCandidate[] = result.aiCoupons.map((c, i) => ({
+          blockIndex: i,
+          raw: `${c.name}\n${c.platform}\n${c.amount}\n${c.expiryDate}`,
+          parsed: {
+            name: c.name,
+            platform: c.platform,
+            amount: c.amount,
+            expiryDate: c.expiryDate,
+            note: c.note,
+          },
+          summary: `${c.name} · ${c.platform} · ${c.amount}`,
+        }));
+        setCandidates(aiCandidates);
 
-      if (list.length === 0) {
-        setOcrError("未识别到有效的券信息，可手动填写");
-      } else if (list.length === 1) {
-        // 单张券：自动填表单
-        const merged = mergeToInput(form, list[0].parsed);
-        setForm(merged);
-        if (list[0].parsed.platform && !tagsInput) {
-          setTagsInput(list[0].parsed.platform);
+        if (aiCandidates.length === 1) {
+          const merged = mergeToInput(form, aiCandidates[0].parsed);
+          setForm(merged);
+          if (aiCandidates[0].parsed.platform && !tagsInput) {
+            setTagsInput(aiCandidates[0].parsed.platform);
+          }
+          setActiveIdx(0);
+        } else {
+          const merged = mergeToInput(form, aiCandidates[0].parsed);
+          setForm(merged);
+          if (aiCandidates[0].parsed.platform && !tagsInput) {
+            setTagsInput(aiCandidates[0].parsed.platform);
+          }
+          setActiveIdx(0);
         }
-        setActiveIdx(0);
       } else {
-        // 多张券：选第一张预填，但展示所有候选让用户切换
-        const merged = mergeToInput(form, list[0].parsed);
-        setForm(merged);
-        if (list[0].parsed.platform && !tagsInput) {
-          setTagsInput(list[0].parsed.platform);
+        // 传统 OCR 识别，需要解析文本
+        const list = parseMultipleCoupons(result.text);
+        setCandidates(list);
+
+        if (list.length === 0) {
+          setOcrError("未识别到有效的券信息，可手动填写");
+        } else if (list.length === 1) {
+          // 单张券：自动填表单
+          const merged = mergeToInput(form, list[0].parsed);
+          setForm(merged);
+          if (list[0].parsed.platform && !tagsInput) {
+            setTagsInput(list[0].parsed.platform);
+          }
+          setActiveIdx(0);
+        } else {
+          // 多张券：选第一张预填，但展示所有候选让用户切换
+          const merged = mergeToInput(form, list[0].parsed);
+          setForm(merged);
+          if (list[0].parsed.platform && !tagsInput) {
+            setTagsInput(list[0].parsed.platform);
+          }
+          setActiveIdx(0);
         }
-        setActiveIdx(0);
       }
     } catch (err: any) {
       console.error("OCR 识别失败:", err);
