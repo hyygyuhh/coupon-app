@@ -398,6 +398,47 @@ export default function ReminderSettings() {
                 className="w-full px-4 py-3.5 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-accent-orange/30 focus:border-accent-orange transition"
               />
             </div>
+
+            {/* 获取 Webhook 说明 */}
+            <div className="mt-4 pt-4 border-t border-accent-grayLight/50">
+              <h4 className="text-sm font-medium text-accent-ink mb-3 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-accent-orange" />
+                如何获取机器人 Webhook
+              </h4>
+              <div className="text-sm text-accent-inkMute">
+                {isDingTalk ? (
+                  <ol className="space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                      <span>打开钉钉群 → 群设置 → 智能群助手 → 添加机器人</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                      <span>选择「自定义」机器人，安全设置勾选「加签」</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                      <span>复制 Webhook 地址和加签密钥到上方</span>
+                    </li>
+                  </ol>
+                ) : (
+                  <ol className="space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                      <span>打开飞书群 → 设置 → 群机器人 → 添加机器人</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                      <span>选择「自定义机器人」，可设置签名校验</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                      <span>复制 Webhook 地址到上方</span>
+                    </li>
+                  </ol>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -836,46 +877,6 @@ export default function ReminderSettings() {
         </div>
       </div>
 
-      {/* 使用说明 */}
-      <div className="mt-6 p-5 bg-white/60 rounded-2xl border border-accent-grayLight/30">
-        <h3 className="font-medium text-accent-ink mb-3 flex items-center gap-2">
-          <Lightbulb className="w-5 h-5 text-accent-orange" />
-          如何获取机器人 Webhook
-        </h3>
-        <div className="text-sm text-accent-inkMute space-y-3">
-          {isDingTalk ? (
-            <ol className="space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
-                <span>打开钉钉群 → 群设置 → 智能群助手 → 添加机器人</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
-                <span>选择「自定义」机器人，安全设置勾选「加签」</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 bg-accent-blue/20 text-accent-blue rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
-                <span>复制 Webhook 地址和加签密钥到上方</span>
-              </li>
-            </ol>
-          ) : (
-            <ol className="space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
-                <span>打开飞书群 → 设置 → 群机器人 → 添加机器人</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
-                <span>选择「自定义机器人」，可设置签名校验</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 bg-accent-green/20 text-accent-green rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
-                <span>复制 Webhook 地址到上方</span>
-              </li>
-            </ol>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
