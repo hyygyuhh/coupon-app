@@ -186,6 +186,9 @@ async function getWorker(): Promise<Worker> {
     const start = performance.now();
     
     const worker = await createWorker("chi_sim+eng", 1, {
+      // 语言包从本地加载（避免 CDN 被墙导致下载失败）
+      // 文件在 public/tessdata/ 目录，构建后会自动部署
+      langPath: `${window.location.origin}/coupon-app/tessdata`,
       logger: (m) => {
         if (m.status === "loading tesseract core") {
           engineStatusText = "正在加载识别引擎";
