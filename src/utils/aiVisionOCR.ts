@@ -49,7 +49,7 @@ export function getAIVisionConfig(): AIVisionConfig {
     qwenBaseURL: "https://agentrs.jd.com/api/saas/openai-u/v1",
     xunfeiApiKey: "",
     xunfeiModelId: "",
-    xunfeiBaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/v1",
+    xunfeiBaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/v2",
     useCorsProxy: true,
   };
 }
@@ -288,35 +288,40 @@ function parseAIResponse(content: string): AIVisionResult {
 }
 
 /**
- * 调用讯飞星火图像理解
- * API: https://maas-api.cn-huabei-1.xf-yun.com/v2/chat/completions
- * 鉴权方式：HMAC-SHA256 签名（api_key:api_secret 格式）
+ * 解析讯飞 API Key
+ * 支持格式：
+ *   - api_key:api_secret          → { apiKey, apiSecret }
+ *   - api_key                     → { apiKey, apiSecret: "" }
+ *   - 带空格/换行的输入           → 自动 trim
  */
-async function callXunfei(
+function parseXunfeiKey(rawKey: string): { apiKey: string; apiSecret: string } {
+  const trimmed = rawKey.trim();
+  const colonIdx = trimmed.indexOf(":");
+  if (colonIdx > 0 && colonIdx < trimmed.length - 1) {
+    return {
+      apiKey: trimmed.substring(0, colonIdx).trim(),
+      apiSecret: trimmed.substring(colonIdx + 1).trim(),
+    };
+  }
+  return { apiKey: trimmed, apiSecret: "" };
+}
+
+/**
+ * 使用 Bearer Token 调用讯飞星火（OpenAI 兼容接口）
+ * 仅使用 api_key 部分（不包含 api_secret）
+ */
+async function callXunfeiWithBearer(
   imageDataUrl: string,
-  config: AIVisionConfig
+  config: AIVisionConfig,
+  parsedKey: { apiKey: string; apiSecret: string }
 ): Promise<AIVisionResult> {
   const baseURL = config.xunfeiBaseURL || "https://maas-api.cn-huabei-1.xf-yun.com/v2";
   const modelId = config.xunfeiModelId || "imagev3";
-
-  // 解析 API Key：格式为 "api_key:api_secret"
-  const apiKeyParts = config.xunfeiApiKey.split(":");
-  if (apiKeyParts.length < 2) {
-    throw new Error(
-      "讯飞 API Key 格式错误，请完整复制（格式：api_key:api_secret）"
-    );
-  }
-  const apiKey = apiKeyParts[0];
-  const apiSecret = apiKeyParts.slice(1).join(":");
+  const { apiKey } = parsedKey;
 
   const match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!match) throw new Error("无效的图片数据");
   const [, imageFormat, base64Data] = match;
-
-  const fullUrl = `${baseURL}/chat/completions`;
-
-  // 生成签名
-  const sig = await generateXunfeiSignature(apiKey, apiSecret, fullUrl);
 
   const body = JSON.stringify({
     model: modelId,
@@ -345,15 +350,15 @@ async function callXunfei(
     temperature: 0.5,
   });
 
+  const url = `${baseURL}/chat/completions`;
+
   const response = await fetchWithCorsProxy(
-    fullUrl,
+    url,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json;charset=UTF-8",
-        Authorization: sig.authorization,
-        Date: sig.date,
-        Host: sig.host,
+        Authorization: `Bearer ${apiKey}`,
       },
       body,
     },
@@ -361,19 +366,192 @@ async function callXunfei(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    let hint = "";
-    if (response.status === 401) {
-      hint =
-        "\n\n排查建议：\n1. 请确认 API Key 完整复制（包含冒号后的 api_secret）\n2. 请确认 Model ID 正确（从讯飞服务管控页面获取）\n3. 请确认账号额度充足";
-    }
-    throw new Error(`讯飞星火 API 错误: ${response.status} - ${error}${hint}`);
+    const errorText = await response.text();
+    const err: any = new Error(
+      `讯飞星火(Bearer) API 错误: ${response.status} - ${errorText}`
+    );
+    err.status = response.status;
+    err.errorText = errorText;
+    err.url = url;
+    throw err;
   }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content || "";
-
   return parseAIResponse(content);
+}
+
+/**
+ * 使用 HMAC-SHA256 签名调用讯飞星火（备用鉴权方式）
+ * 需要同时提供 api_key 和 api_secret
+ */
+async function callXunfeiWithHMAC(
+  imageDataUrl: string,
+  config: AIVisionConfig,
+  parsedKey: { apiKey: string; apiSecret: string }
+): Promise<AIVisionResult> {
+  const baseURL = config.xunfeiBaseURL || "https://maas-api.cn-huabei-1.xf-yun.com/v2";
+  const modelId = config.xunfeiModelId || "imagev3";
+  const { apiKey, apiSecret } = parsedKey;
+
+  if (!apiSecret) {
+    throw new Error("HMAC 签名需要提供 api_secret（API Key 格式应为 api_key:api_secret）");
+  }
+
+  const match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!match) throw new Error("无效的图片数据");
+  const [, imageFormat, base64Data] = match;
+
+  const url = `${baseURL}/chat/completions`;
+
+  // 构造 HMAC 签名：host + date + request-line 必须字节级一致
+  const sig = await generateXunfeiSignature(apiKey, apiSecret, url);
+
+  const body = JSON.stringify({
+    model: modelId,
+    messages: [
+      {
+        role: "system",
+        content: SYSTEM_PROMPT,
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/${imageFormat};base64,${base64Data}`,
+            },
+          },
+          {
+            type: "text",
+            text: "请识别这张优惠券图片，返回 JSON 格式结果。",
+          },
+        ],
+      },
+    ],
+    max_tokens: 2000,
+    temperature: 0.5,
+  });
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json;charset=UTF-8",
+    host: sig.host,
+    date: sig.date,
+    Authorization: sig.authorization,
+  };
+
+  const response = await fetchWithCorsProxy(
+    url,
+    {
+      method: "POST",
+      headers,
+      body,
+    },
+    config.useCorsProxy
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const err: any = new Error(
+      `讯飞星火(HMAC) API 错误: ${response.status} - ${errorText}`
+    );
+    err.status = response.status;
+    err.errorText = errorText;
+    err.url = url;
+    throw err;
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+  return parseAIResponse(content);
+}
+
+/**
+ * 调用讯飞星火图像理解
+ * 鉴权策略：
+ *   1. 先尝试 Bearer Token（仅使用 api_key 部分，OpenAI 兼容接口）
+ *   2. 若 401 且提供了 api_secret，再尝试 HMAC-SHA256 签名鉴权
+ *
+ * API Key 格式：api_key:api_secret 或单独的 api_key
+ */
+async function callXunfei(
+  imageDataUrl: string,
+  config: AIVisionConfig
+): Promise<AIVisionResult> {
+  const rawKey = config.xunfeiApiKey.trim();
+  const modelId = config.xunfeiModelId || "";
+
+  if (!rawKey) {
+    throw new Error("请先在设置中填写讯飞 API Key");
+  }
+  if (!modelId || modelId === "imagev3") {
+    console.warn(
+      "[Xunfei] 未填写 Model ID 或使用默认值，请从服务管控页面获取正确的模型 ID"
+    );
+  }
+
+  const parsedKey = parseXunfeiKey(rawKey);
+  console.log("[Xunfei] 解析 API Key:", {
+    hasApiKey: !!parsedKey.apiKey,
+    hasApiSecret: !!parsedKey.apiSecret,
+  });
+
+  // 策略1：先尝试 Bearer Token
+  try {
+    return await callXunfeiWithBearer(imageDataUrl, config, parsedKey);
+  } catch (firstErr: any) {
+    const status = firstErr.status || 0;
+    const errorText = firstErr.errorText || firstErr.message || "";
+
+    // 仅当 401 且有 api_secret 时，才回退到 HMAC 签名
+    const isAuthError =
+      status === 401 ||
+      errorText.toLowerCase().includes("hmac signature") ||
+      errorText.toLowerCase().includes("apikey not found");
+
+    if (isAuthError && parsedKey.apiSecret) {
+      console.warn(
+        "[Xunfei] Bearer Token 鉴权失败（401），尝试 HMAC-SHA256 签名鉴权..."
+      );
+      try {
+        return await callXunfeiWithHMAC(imageDataUrl, config, parsedKey);
+      } catch (secondErr: any) {
+        throw buildXunfeiError(secondErr, parsedKey);
+      }
+    }
+
+    // 其他错误直接抛出
+    throw buildXunfeiError(firstErr, parsedKey);
+  }
+}
+
+function buildXunfeiError(
+  err: any,
+  parsedKey: { apiKey: string; apiSecret: string }
+): Error {
+  const status = err.status || 0;
+  const errorText = err.errorText || err.message || "";
+
+  let hint = "";
+  if (status === 401) {
+    hint =
+      "\n\n🔧 401 鉴权失败排查建议：\n" +
+      `   - 当前使用 API Key 长度：${parsedKey.apiKey.length} 字符${
+        parsedKey.apiSecret ? `，含 api_secret(${parsedKey.apiSecret.length} 字符)` : "，未检测到 api_secret"
+      }\n` +
+      "   1. 从讯飞服务管控页面复制完整的 APIKey（通常是 api_key:api_secret 形式）\n" +
+      "   2. 确认 API 地址是 /v1 还是 /v2（在服务管控页面查看）\n" +
+      "   3. 确认 Model ID 正确（不是默认 imagev3，需从服务管控页面获取）\n" +
+      "   4. 确认账号额度充足（登录讯飞控制台查看）\n" +
+      "   5. 尝试关闭/开启 CORS 代理\n" +
+      "\n原始错误信息：";
+  } else if (status === 500 || status === 503) {
+    hint =
+      "\n\n⚠️ 服务端错误：通常是账号额度不足或 Model ID 错误，请到讯飞控制台检查。\n原始错误：";
+  }
+
+  return new Error(`讯飞星火 API 错误: ${status || "网络"}${hint}${errorText}`);
 }
 
 /**
