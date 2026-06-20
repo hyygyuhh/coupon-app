@@ -49,7 +49,7 @@ export function getAIVisionConfig(): AIVisionConfig {
     qwenBaseURL: "https://agentrs.jd.com/api/saas/openai-u/v1",
     xunfeiApiKey: "",
     xunfeiModelId: "",
-    xunfeiBaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/v2",
+    xunfeiBaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/v1",
     useCorsProxy: true,
   };
 }

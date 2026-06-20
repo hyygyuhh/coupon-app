@@ -188,7 +188,7 @@ function AISettings() {
               type="text"
               value={aiConfig.xunfeiBaseURL || ""}
               onChange={(e) => handleXunfeiBaseURLChange(e.target.value)}
-              placeholder="https://maas-api.cn-huabei-1.xf-yun.com/v2"
+              placeholder="https://maas-api.cn-huabei-1.xf-yun.com/v1"
               className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
             />
           </div>
