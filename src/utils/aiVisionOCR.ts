@@ -288,16 +288,50 @@ function parseAIResponse(content: string): AIVisionResult {
 }
 
 /**
- * 调用讯飞星火图像理解
+ * 从响应数据中提取文本内容（兼容多种返回格式）
+ *   格式1: { choices: [{ message: { content: "..." } }] }  —— OpenAI 图像理解格式
+ *   格式2: { choices: [{ text: "..." }] }                  —— OpenAI completions 格式
+ *   格式3: { result: "..." } 或 { data: "..." } 或 { text: "..." }  —— 自定义 OCR 返回
+ *   格式4: string 原始文本
+ */
+function extractXunfeiContent(data: any): string {
+  // 格式1: chat.completions
+  if (data?.choices?.[0]?.message?.content) {
+    return data.choices[0].message.content;
+  }
+  // 格式2: completions
+  if (data?.choices?.[0]?.text) {
+    return data.choices[0].text;
+  }
+  if (typeof data?.choices?.[0] === "string") {
+    return data.choices[0];
+  }
+  // 格式3: 扁平返回
+  if (data?.content) return data.content;
+  if (data?.result) return data.result;
+  if (data?.data) {
+    return typeof data.data === "string" ? data.data : JSON.stringify(data.data);
+  }
+  if (data?.output) {
+    return typeof data.output === "string" ? data.output : JSON.stringify(data.output);
+  }
+  if (data?.text) return data.text;
+  // 兜底：字符串化
+  if (typeof data === "string") return data;
+  return JSON.stringify(data);
+}
+
+/**
+ * 调用讯飞星火（支持多种模型类型：图像理解 / OCR / 通用多模态）
  *
- * 严格按官方文档实现：https://www.xfyun.cn/doc/spark/%E5%9B%BE%E5%83%8F%E7%90%86%E8%A7%A3API-http.html
+ * 由于 MaaS 平台上不同模型（xqwen2d5s32bvl 图像理解 vs xoppaddleocrv16 OCR）
+ * 可能使用不同的 API 路径和请求体格式，本函数会自动尝试多种常见组合。
  *
- * 关键点（来自官方文档）:
- *   1. 鉴权方式：OpenAI 兼容接口 - Bearer Token（无需 HMAC 签名）
- *   2. API Key: 从「服务管控 > 模型服务列表」复制对应服务的 APIKey（简单字符串）
- *   3. 请求地址: https://maas-api.cn-huabei-1.xf-yun.com/v2（2026年1月10日后发布服务）
- *   4. messages.role: 仅支持 "user"（文档明确标注）
- *   5. Model ID: 从「服务管控 > 模型服务列表」获取（如：xqwen2d5s32bvl 等）
+ * 尝试顺序：
+ *   1. {baseURL}/chat/completions + messages[text+image]  （图像理解模型标准格式）
+ *   2. {baseURL}/chat/completions + messages[image only]   （OCR 模型可能不需要 text prompt）
+ *   3. {baseURL}/completions + prompt/inputs                （兼容 completions 风格）
+ *   4. baseURL 本身（如果用户已配置完整路径）
  */
 async function callXunfei(
   imageDataUrl: string,
@@ -314,8 +348,7 @@ async function callXunfei(
     throw new Error("请先在设置中填写讯飞 Model ID（从服务管控页面获取）");
   }
 
-  // API Key 处理：按官方文档是简单字符串，但若用户粘贴的是 "api_key:api_secret"，
-  // 取冒号前面的部分作为真正的 Key（兼容两种输入）
+  // API Key：冒号分隔时取前半部分（兼容 api_key:api_secret 输入方式）
   const colonIdx = rawKey.indexOf(":");
   const apiKey = colonIdx > 0 ? rawKey.substring(0, colonIdx).trim() : rawKey;
 
@@ -323,82 +356,164 @@ async function callXunfei(
   if (!match) throw new Error("无效的图片数据");
   const [, imageFormat, base64Data] = match;
 
-  // 按官方文档：role 只支持 "user"，content 为包含 text + image_url 的数组
-  // 将系统提示合并到用户消息的 text 里
-  const fullPrompt = `${SYSTEM_PROMPT}\n\n请识别这张优惠券图片，返回 JSON 格式结果。`;
-
-  const requestBody = {
-    model: modelId,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:image/${imageFormat};base64,${base64Data}`,
-            },
-          },
-          {
-            type: "text",
-            text: fullPrompt,
-          },
-        ],
-      },
-    ],
-    max_tokens: 2048,
-    temperature: 0.5,
-    stream: false,
+  // 处理 baseURL：如果用户已经写了完整的带路径 URL（如 .../v2/chat/completions），
+  // 就不再自动追加路径；否则按 "基础路径 + /chat/completions" 处理
+  const normalizeURL = (base: string, defaultPath: string): string => {
+    const trimmed = base.replace(/\/+$/, "");
+    // 如果 baseURL 已经包含具体路径（含 /chat 或 /completions 或 /ocr 等）
+    if (
+      trimmed.includes("/chat/") ||
+      trimmed.endsWith("/chat/completions") ||
+      trimmed.endsWith("/completions") ||
+      trimmed.endsWith("/ocr") ||
+      trimmed.endsWith("/predict") ||
+      trimmed.endsWith("/generate")
+    ) {
+      return trimmed;
+    }
+    return trimmed + defaultPath;
   };
 
-  const url = `${baseURL}/chat/completions`;
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n请识别这张优惠券图片，返回 JSON 格式结果。`;
+  const imageUrl = `data:image/${imageFormat};base64,${base64Data}`;
 
-  // Debug 日志（脱敏 Key）
-  const maskedKey = apiKey.length > 8
-    ? apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length - 4)
-    : "***";
-  console.log(`[Xunfei] 请求: POST ${url}`);
-  console.log(`[Xunfei]   API Key: ${maskedKey} (长度: ${apiKey.length})`);
-  console.log(`[Xunfei]   Model ID: ${modelId}`);
-  console.log(`[Xunfei]   Headers: Authorization=Bearer, Content-Type=application/json`);
-
-  const response = await fetchWithCorsProxy(
-    url,
+  // 构造多种候选请求方案，按顺序尝试
+  const attempts: Array<{
+    url: string;
+    body: Record<string, unknown>;
+    description: string;
+  }> = [
     {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+      description: "chat/completions + messages[text+image_url]",
+      url: normalizeURL(baseURL, "/chat/completions"),
+      body: {
+        model: modelId,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: imageUrl } },
+              { type: "text", text: fullPrompt },
+            ],
+          },
+        ],
+        max_tokens: 2048,
+        temperature: 0.5,
+        stream: false,
       },
-      body: JSON.stringify(requestBody),
     },
-    config.useCorsProxy
-  );
+    {
+      description: "chat/completions + messages[image_url only]",
+      url: normalizeURL(baseURL, "/chat/completions"),
+      body: {
+        model: modelId,
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "image_url", image_url: { url: imageUrl } }],
+          },
+        ],
+        max_tokens: 2048,
+        stream: false,
+      },
+    },
+    {
+      description: "completions + prompt(image base64)",
+      url: normalizeURL(baseURL, "/completions"),
+      body: {
+        model: modelId,
+        prompt: imageUrl,
+        max_tokens: 2048,
+        temperature: 0.3,
+        stream: false,
+      },
+    },
+  ];
 
-  console.log(`[Xunfei]   响应状态: ${response.status} ${response.statusText}`);
+  // 调试日志
+  const maskedKey =
+    apiKey.length > 8
+      ? apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length - 4)
+      : "***";
+  console.log(`[Xunfei] Model ID: ${modelId}`);
+  console.log(`[Xunfei] API Key: ${maskedKey} (长度: ${apiKey.length})`);
+  console.log(`[Xunfei] Base URL: ${baseURL}`);
+  console.log(`[Xunfei] 即将尝试 ${attempts.length} 种请求方案...`);
 
-  if (!response.ok) {
+  // 逐个方案尝试，遇到 404 / 422 / schema error 这类"路径或格式不支持"
+  // 的错误时自动切换到下一个方案；401 则立即停止（鉴权问题不是格式问题）
+  const nonRetryStatuses = new Set([401, 403]);
+  const lastErrors: Array<{ status: number; text: string; url: string }> = [];
+
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i];
+    console.log(
+      `[Xunfei] 方案 ${i + 1}/${attempts.length}: POST ${attempt.url} (${attempt.description})`
+    );
+
+    const response = await fetchWithCorsProxy(
+      attempt.url,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(attempt.body),
+      },
+      config.useCorsProxy
+    );
+
+    console.log(`[Xunfei]   → 状态: ${response.status} ${response.statusText}`);
+
+    if (response.ok) {
+      const data = await response.json();
+      const content = extractXunfeiContent(data);
+      console.log(
+        `[Xunfei]   ✅ 成功！方案 ${i + 1} 可用，响应内容长度: ${content.length}`
+      );
+      if (content) {
+        return parseAIResponse(content);
+      }
+      console.warn(`[Xunfei]   响应内容为空，继续尝试下一个方案...`);
+      lastErrors.push({
+        status: response.status,
+        text: "响应内容为空，可能模型没有返回文本",
+        url: attempt.url,
+      });
+      continue;
+    }
+
     const errorText = await response.text();
-    console.error(`[Xunfei]   错误响应: ${errorText}`);
-    throw buildXunfeiError(response.status, errorText, {
-      apiKeyLength: apiKey.length,
-      modelId,
-      url,
-    });
+    console.error(`[Xunfei]   ❌ 失败: ${errorText}`);
+
+    lastErrors.push({ status: response.status, text: errorText, url: attempt.url });
+
+    // 401 / 403 是鉴权问题，换格式没用 —— 立即停止
+    if (nonRetryStatuses.has(response.status)) {
+      break;
+    }
+
+    // 其他错误（404 / 422 / 500 schema 不匹配等），继续尝试下一个方案
+    if (i < attempts.length - 1) {
+      console.log(`[Xunfei]   格式不支持，切换到下一个方案...`);
+    }
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-
-  console.log(`[Xunfei]   成功，响应内容长度: ${content.length}`);
-
-  return parseAIResponse(content);
+  // 所有方案均失败
+  const last = lastErrors[lastErrors.length - 1];
+  throw buildXunfeiError(last?.status || 0, last?.text || "未知错误", {
+    apiKeyLength: apiKey.length,
+    modelId,
+    url: last?.url || baseURL,
+    attempts: lastErrors.map((e) => `${e.status}: ${e.url}`).join("; "),
+  });
 }
 
 function buildXunfeiError(
   status: number,
   errorText: string,
-  info: { apiKeyLength: number; modelId: string; url: string }
+  info: { apiKeyLength: number; modelId: string; url: string; attempts?: string }
 ): Error {
   let hint = "";
 
@@ -407,29 +522,39 @@ function buildXunfeiError(
       "\n\n🔧 401 鉴权失败（参考官方文档）：\n" +
       `   - API Key 长度: ${info.apiKeyLength} 字符\n` +
       `   - 使用的 Model ID: ${info.modelId}\n` +
-      `   - 请求地址: ${info.url}\n` +
+      `   - 最后尝试的请求地址: ${info.url}\n` +
       "   排查步骤:\n" +
       "   1. 登录讯飞开放平台，进入「服务管控 > 模型服务列表」\n" +
-      "   2. 找到你开通的图像理解服务，复制「APIKey」（不是 WebSocket 接口的 APPID/APIKey/APISecret）\n" +
-      "   3. 复制该服务对应的「Model ID」（通常是 xqwen2d5s32bvl 这类格式）\n" +
-      "   4. 确认 API 地址：2026年1月10日后发布的服务用 /v2，之前的用 /v1\n" +
-      "   5. 确认账号额度充足\n" +
-      "\n⚠️ 注意：HTTP OpenAI 兼容接口使用简单的 Bearer Token，\n" +
-      "       与 WebSocket 接口的 APPID/APISecret 不是一套密钥！\n" +
+      "   2. 找到你开通的服务，复制对应服务的「APIKey」（简单字符串，不是 WebSocket 的三要素）\n" +
+      "   3. 复制同一服务的「Model ID」\n" +
+      "   4. 确认账号额度充足\n" +
+      "   5. 如仍失败，请在讯飞控制台查看该服务的调用信息，确认 API 地址\n" +
+      "\n⚠️ 注意：图像理解 HTTP 协议使用 Bearer Token，不是 WebSocket 的 APPID/APISecret 三要素！\n" +
       "\n原始错误信息：";
   } else if (status === 403) {
     hint =
       "\n\n🔧 403 错误：\n" +
-      "   - 可能是模型 ID 与 API Key 不匹配（APIKey 只对对应服务的模型有权限）\n" +
-      "   - 可能是地区/IP 限制\n" +
-      "   - 请确认 Model ID 与 API Key 来自同一个服务\n" +
+      "   - API Key 与 Model ID 不匹配（Key 只对对应服务有权限）\n" +
+      "   - 或地区/IP 访问受限\n" +
+      "   请确认 Model ID 与 API Key 来自同一个服务\n" +
+      "\n原始错误信息：";
+  } else if (status === 404) {
+    hint =
+      "\n\n🔧 404 错误：API 路径不支持该模型\n" +
+      "   请在讯飞服务管控页面查看该服务的具体 API 地址\n" +
       "\n原始错误信息：";
   } else if (status === 500 || status === 503) {
     hint =
-      "\n\n⚠️ 服务端错误：通常是账号额度不足或 Model ID 错误，请到讯飞控制台检查。\n原始错误：";
-  } else if (status === 0 || status === 400 || status === 429) {
+      "\n\n⚠️ 服务端错误：账号额度不足 / 模型不可用 / 参数格式不匹配\n请在讯飞控制台确认额度与服务状态\n原始错误：";
+  } else if (status === 400 || status === 422) {
     hint =
-      "\n\n⚠️ 请求失败或被限流：请稍后重试，或检查参数是否正确。\n原始错误：";
+      "\n\n⚠️ 参数格式错误：模型不支持此请求结构，请在讯飞控制台查看该服务的文档\n原始错误：";
+  } else if (status === 429) {
+    hint = "\n\n⚠️ 请求过快或额度不足：请稍后重试或检查账号额度\n原始错误：";
+  }
+
+  if (info.attempts) {
+    hint += `\n（已尝试的方案: ${info.attempts}）`;
   }
 
   return new Error(`讯飞星火 API 错误: ${status || "网络"}${hint}${errorText}`);
