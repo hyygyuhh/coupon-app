@@ -336,6 +336,8 @@ async function main() {
   }
 
   // 4. 检查当前时间是否在提醒时间范围内
+  // 改为：当天任何时间都可以发送（但同一张券当天只提醒一次）
+  // 这样既保证了每天1次，又不会因为 GitHub Actions 延迟而错过
   const reminderHour = data.config.dailyReminderHour !== undefined ? data.config.dailyReminderHour : 9;
   const now = new Date();
   const currentHourUTC = now.getUTCHours();
@@ -345,15 +347,34 @@ async function main() {
   console.log(`⏰ 当前 UTC 时间：${currentHourUTC}:${String(now.getUTCMinutes()).padStart(2, '0')}`);
   console.log(`⏰ 配置提醒时间：北京时间 ${reminderHour}:00 (UTC ${adjustedReminderHourUTC}:00)`);
   
-  if (currentHourUTC !== adjustedReminderHourUTC) {
-    console.log('⏰ 当前时间不在提醒时间范围内，跳过本次检查');
+  // 判断是否是手动触发（通过 GitHub Actions 的 workflow_dispatch）
+  // 手动触发或到了提醒时间，都发送
+  const isCorrectHour = currentHourUTC === adjustedReminderHourUTC;
+  const isManualTrigger = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
+  
+  // 检查今天是否已经发送过提醒
+  const todayKey = getTodayKey();
+  const todayStatus = data.status.remindedToday || {};
+  const hasRemindedToday = Object.keys(todayStatus).some(key => todayStatus[key] === todayKey);
+  
+  if (hasRemindedToday && !isManualTrigger) {
+    console.log('✅ 今天已经发送过提醒，跳过');
     return;
+  }
+  
+  if (!isCorrectHour && !isManualTrigger) {
+    console.log(`⏰ 当前时间不是提醒时间（UTC ${adjustedReminderHourUTC}:00），跳过`);
+    console.log('💡 如需测试，可在 GitHub Actions 手动触发 workflow_dispatch');
+    return;
+  }
+  
+  if (isManualTrigger) {
+    console.log('🔧 手动触发模式，发送提醒');
+  } else {
+    console.log('✅ 到达提醒时间，开始筛选优惠券');
   }
 
   // 5. 筛选即将过期的优惠券
-  const todayKey = getTodayKey();
-  const todayStatus = data.status.remindedToday || {};
-  
   console.log(`📅 今日日期：${todayKey}`);
   console.log(`🔍 开始筛选即将过期（${REMINDER_DAYS}天内）的优惠券...`);
   console.log(`📊 总优惠券数：${data.coupons.length}`);
@@ -371,14 +392,26 @@ async function main() {
         return false;
       }
       
-      if (c.status !== 'unused') {
-        console.log(`⏭️ ${c.name}: status=${c.status}，跳过`);
+      // 兼容状态字段：如果没有状态字段，默认为未使用
+      const couponStatus = (c.status || 'unused').toString().toLowerCase();
+      const isUnused = couponStatus === 'unused' || couponStatus === '未使用';
+      
+      if (!isUnused) {
+        console.log(`⏭️ ${c.name}: status=${c.status}，跳过（只提醒未使用的券）`);
         return false;
       }
       
       const daysLeft = daysUntil(c.expiryDate);
-      if (daysLeft < 0 || daysLeft > REMINDER_DAYS) {
-        console.log(`⏭️ ${c.name}: daysLeft=${daysLeft}，超出范围[0, ${REMINDER_DAYS}]，跳过`);
+      if (isNaN(daysLeft)) {
+        console.log(`⚠️ ${c.name}: expiryDate=${c.expiryDate}，日期格式无效，跳过`);
+        return false;
+      }
+      if (daysLeft < 0) {
+        console.log(`⏭️ ${c.name}: daysLeft=${daysLeft}，已过期，跳过`);
+        return false;
+      }
+      if (daysLeft > REMINDER_DAYS) {
+        console.log(`⏭️ ${c.name}: daysLeft=${daysLeft}，超过提醒阈值${REMINDER_DAYS}天，跳过`);
         return false;
       }
       
@@ -440,7 +473,9 @@ async function main() {
     }
   } else if (REMINDER_TYPE === 'feishu' && hasFeishu) {
     const text = buildFeishuText(expiringCoupons);
-    console.log('📝 消息内容:', text.substring(0, 100) + '...');
+    console.log('📝 消息内容:', text);
+    console.log('📡 Webhook URL 长度:', FEISHU_WEBHOOK.length);
+    console.log('🔑 Secret 已配置:', FEISHU_SECRET ? '是' : '否');
     try {
       success = await sendFeishuMessage(FEISHU_WEBHOOK, FEISHU_SECRET, {
         msg_type: 'text',
@@ -448,9 +483,12 @@ async function main() {
       });
       if (success) {
         console.log('✅ 飞书提醒发送成功');
+      } else {
+        console.log('❌ 飞书提醒发送失败，请检查返回信息');
       }
     } catch (error) {
-      console.log('❌ 飞书提醒发送失败:', error.message);
+      console.log('❌ 飞书提醒发送异常:', error.message);
+      console.log('❌ 完整错误:', error);
     }
   }
   
