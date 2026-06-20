@@ -91,21 +91,36 @@ const CORS_PROXIES = [
 ];
 
 /**
- * 讯飞 HMAC-SHA256 签名生成
- * API Key 格式：<api_key>:<api_secret>
+ * 讯飞 HMAC-SHA256 签名生成（支持多种签名模式）
+ *
+ * 模式 1（标准）：host + date + request-line
+ * 模式 2（无 host）：date + request-line（适用于 CORS 代理场景，代理会重写 Host）
  */
 async function generateXunfeiSignature(
   apiKey: string,
   apiSecret: string,
-  fullUrl: string
+  fullUrl: string,
+  mode: "standard" | "no-host" = "standard"
 ): Promise<{ authorization: string; date: string; host: string }> {
   const url = new URL(fullUrl);
   const host = url.host;
   const date = new Date().toUTCString();
   const requestLine = `POST ${url.pathname} HTTP/1.1`;
 
-  // 签名原文：host: xxx\ndate: xxx\nPOST /path HTTP/1.1
-  const signatureOrigin = `host: ${host}\ndate: ${date}\n${requestLine}`;
+  let signatureOrigin: string;
+  let headersStr: string;
+
+  if (mode === "no-host") {
+    // 不含 host 的签名（CORS 代理场景）
+    signatureOrigin = `date: ${date}\n${requestLine}`;
+    headersStr = "date request-line";
+  } else {
+    // 标准签名
+    signatureOrigin = `host: ${host}\ndate: ${date}\n${requestLine}`;
+    headersStr = "host date request-line";
+  }
+
+  console.log(`[Xunfei]     签名模式: ${mode}, 签名原文(脱敏): ${signatureOrigin.substring(0, 60)}...`);
 
   // 使用 Web Crypto API 做 HMAC-SHA256
   const keyData = new TextEncoder().encode(apiSecret);
@@ -124,7 +139,7 @@ async function generateXunfeiSignature(
     String.fromCharCode(...new Uint8Array(signatureBuffer))
   );
 
-  const authorization = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+  const authorization = `api_key="${apiKey}", algorithm="hmac-sha256", headers="${headersStr}", signature="${signature}"`;
 
   return { authorization, date, host };
 }
@@ -464,84 +479,72 @@ async function callXunfei(
   if (hasSecret) {
     console.log(`[Xunfei] ===== 阶段 1：HMAC 签名鉴权 =====`);
 
-    for (const path of paths) {
-      for (const { body, description } of bodies) {
-        const url = normalizeURL(baseURL, path);
-        const authInfo = `HMAC(headers="host date request-line")`;
-        console.log(
-          `[Xunfei]   POST ${url} (${description})`
-        );
+    // 两种签名模式：标准（含 host）和无 host（适配 CORS 代理）
+    const sigModes: Array<"standard" | "no-host"> = ["standard", "no-host"];
 
-        // 每次请求生成新的签名（date 必须实时）
-        const sig = await generateXunfeiSignature(apiKey, apiSecret, url);
-        const bodyStr = JSON.stringify(body);
+    let hmacDone = false;
+    for (const sigMode of sigModes) {
+      if (hmacDone) break;
 
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          host: sig.host,
-          date: sig.date,
-          Authorization: sig.authorization,
-        };
+      for (const path of paths) {
+        if (hmacDone) break;
 
-        // ⚠️ HMAC 签名请求必须直连！CORS 代理会重写 host/date 头，导致签名不匹配
-        const response = await fetchWithCorsProxy(
-          url,
-          { method: "POST", headers, body: bodyStr },
-          false // 强制不走 CORS 代理
-        );
+        for (const { body, description } of bodies) {
+          const url = normalizeURL(baseURL, path);
+          const authInfo = `HMAC(${sigMode})`;
+          console.log(`[Xunfei]   POST ${url} (${description}, 签名: ${sigMode})`);
 
-        console.log(`[Xunfei]   → 状态: ${response.status}`);
+          // 每次请求生成新的签名（date 必须实时）
+          const sig = await generateXunfeiSignature(apiKey, apiSecret, url, sigMode);
+          const bodyStr = JSON.stringify(body);
 
-        if (response.ok) {
-          const data = await response.json();
-          const content = extractXunfeiContent(data);
-          console.log(
-            `[Xunfei]   ✅ 成功！响应内容长度: ${content.length}`
-          );
-          if (content) {
-            return parseAIResponse(content);
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            date: sig.date,
+            Authorization: sig.authorization,
+          };
+
+          // 标准模式附带 host 头；no-host 模式不附带（让代理/浏览器自行处理）
+          if (sigMode === "standard") {
+            headers["host"] = sig.host;
           }
-          console.warn(`[Xunfei]   响应内容为空，继续尝试...`);
-          lastErrors.push({
-            status: response.status,
-            text: "响应内容为空",
+
+          const response = await fetchWithCorsProxy(
             url,
-            auth: authInfo,
-          });
-          continue;
-        }
+            { method: "POST", headers, body: bodyStr },
+            config.useCorsProxy
+          );
 
-        const errorText = await response.text();
-        console.error(`[Xunfei]   ❌ 失败: ${errorText}`);
-        lastErrors.push({ status: response.status, text: errorText, url, auth: authInfo });
+          console.log(`[Xunfei]   → 状态: ${response.status}`);
 
-        // HMAC 401 / "HMAC secret key does not match" 是鉴权问题，继续试其他路径没用
-        // 但如果是 schema 错误（400/422/500），可能只是请求体格式不对，继续试
-        if (
-          response.status === 401 ||
-          errorText.toLowerCase().includes("hmac signature cannot be verified") ||
-          errorText.toLowerCase().includes("hmac secret key does not match") ||
-          errorText.toLowerCase().includes("apikey not found")
-        ) {
-          // 401：停止阶段 1 的所有尝试，直接进入阶段 2
-          console.log(`[Xunfei]   HMAC 鉴权被拒绝，切换到 Bearer Token 方式...`);
-          break;
-        }
+          if (response.ok) {
+            const data = await response.json();
+            const content = extractXunfeiContent(data);
+            console.log(`[Xunfei]   ✅ 成功！签名模式: ${sigMode}, 响应长度: ${content.length}`);
+            if (content) {
+              return parseAIResponse(content);
+            }
+            lastErrors.push({ status: response.status, text: "响应内容为空", url, auth: authInfo });
+            continue;
+          }
 
-        // 标记跳出双重循环
-        if (lastErrors.length > 0) {
-          const last = lastErrors[lastErrors.length - 1];
-          if (last.status === 401 || last.text.toLowerCase().includes("hmac")) {
+          const errorText = await response.text();
+          console.error(`[Xunfei]   ❌ 失败 [${sigMode}]: ${errorText}`);
+          lastErrors.push({ status: response.status, text: errorText, url, auth: authInfo });
+
+          // 鉴权错误：如果是 "secret key does not match"，说明 api_secret 不对，不需要再试其他签名模式
+          if (errorText.toLowerCase().includes("secret key does not match")) {
+            console.log(`[Xunfei]   API Secret 不匹配，停止 HMAC 尝试`);
+            hmacDone = true;
             break;
           }
-        }
-      }
 
-      // 检查是否需要跳出路径循环
-      if (lastErrors.length > 0) {
-        const last = lastErrors[lastErrors.length - 1];
-        if (last.status === 401 || last.text.toLowerCase().includes("hmac")) {
-          break;
+          // 如果是 "apikey not found" 或其他 401，换签名模式再试
+          if (response.status === 401) {
+            console.log(`[Xunfei]   401，尝试下一个签名模式...`);
+            hmacDone = true; // 跳出内层循环，进入下一个 sigMode
+            break;
+          }
         }
       }
     }
