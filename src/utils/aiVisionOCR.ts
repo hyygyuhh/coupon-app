@@ -483,10 +483,11 @@ async function callXunfei(
           Authorization: sig.authorization,
         };
 
+        // ⚠️ HMAC 签名请求必须直连！CORS 代理会重写 host/date 头，导致签名不匹配
         const response = await fetchWithCorsProxy(
           url,
           { method: "POST", headers, body: bodyStr },
-          config.useCorsProxy
+          false // 强制不走 CORS 代理
         );
 
         console.log(`[Xunfei]   → 状态: ${response.status}`);
