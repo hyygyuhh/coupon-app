@@ -1,9 +1,12 @@
 /**
  * AI 视觉识别服务
- * 
+ *
  * 支持多种 AI 模型识别优惠券图片：
  * - Qwen2.5-VL-7B
  * - 讯飞星火图像理解
+ *
+ * 注：浏览器直接调用第三方 API 时可能遇到 CORS 跨域限制，
+ * 本模块会自动尝试通过公共 CORS 代理转发请求。
  */
 
 import type { CouponInput } from "../types/coupon";
@@ -17,6 +20,7 @@ export interface AIVisionConfig {
   xunfeiApiKey: string;
   xunfeiModelId: string;
   xunfeiBaseURL: string;
+  useCorsProxy: boolean;
 }
 
 const CONFIG_KEY = "ai-vision-config";
@@ -33,6 +37,7 @@ export function getAIVisionConfig(): AIVisionConfig {
         xunfeiApiKey: parsed.xunfeiApiKey || "",
         xunfeiModelId: parsed.xunfeiModelId || "",
         xunfeiBaseURL: parsed.xunfeiBaseURL || "https://maas-api.cn-huabei-1.xf-yun.com/v2",
+        useCorsProxy: parsed.useCorsProxy !== undefined ? parsed.useCorsProxy : true,
       };
     } catch {
       // ignore
@@ -45,6 +50,7 @@ export function getAIVisionConfig(): AIVisionConfig {
     xunfeiApiKey: "",
     xunfeiModelId: "",
     xunfeiBaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/v2",
+    useCorsProxy: true,
   };
 }
 
@@ -77,6 +83,62 @@ const SYSTEM_PROMPT = `你是一个优惠券识别助手。用户会发送一张
 
 只返回 JSON，不要其他文字。`;
 
+// CORS 代理列表（按优先级尝试）
+// 注意：代理只负责转发请求，不会修改请求头或响应内容
+const CORS_PROXIES = [
+  "https://corsproxy.io/?",
+  "https://api.allorigins.win/raw?url=",
+];
+
+/**
+ * 使用 CORS 代理执行 fetch 请求
+ * 先尝试直连，失败再依次尝试代理
+ */
+async function fetchWithCorsProxy(
+  url: string,
+  options: RequestInit,
+  useProxy: boolean
+): Promise<Response> {
+  // 先尝试直连
+  if (!useProxy) {
+    return await fetch(url, options);
+  }
+
+  const attempts: string[] = [];
+  let lastError: Error | null = null;
+
+  // 1) 先直连
+  try {
+    attempts.push("直连");
+    const response = await fetch(url, options);
+    return response;
+  } catch (e: any) {
+    lastError = e;
+    console.warn("[CORS] 直连失败，尝试代理:", e?.message);
+  }
+
+  // 2) 依次尝试 CORS 代理
+  for (const proxyPrefix of CORS_PROXIES) {
+    try {
+      attempts.push(`代理:${proxyPrefix.split("?")[0]}`);
+      const proxiedUrl = proxyPrefix + encodeURIComponent(url);
+      const response = await fetch(proxiedUrl, options);
+      return response;
+    } catch (e: any) {
+      lastError = e;
+      console.warn("[CORS] 代理失败:", e?.message);
+    }
+  }
+
+  // 3) 全部失败
+  throw new Error(
+    `所有请求方式均失败（尝试：${attempts.join(" / ")}）。` +
+      `最后错误: ${lastError?.message || "Failed to fetch"}。` +
+      `\n原因：浏览器 CORS 跨域限制。` +
+      `\n建议：检查 API Key 是否正确，或在设置中开启 CORS 代理。`
+  );
+}
+
 /**
  * 调用 Qwen2.5-VL-7B
  * API: https://agentrs.jd.com/api/saas/openai-u/v1/chat/completions
@@ -91,39 +153,45 @@ async function callQwen(
   if (!match) throw new Error("无效的图片数据");
   const [, imageFormat, base64Data] = match;
 
-  const response = await fetch(`${baseURL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json;charset=UTF-8",
-      Authorization: `Bearer ${config.qwenApiKey}`,
-    },
-    body: JSON.stringify({
-      model: "Qwen2.5-VL-7B",
-      messages: [
-        {
-          role: "system",
-          content: SYSTEM_PROMPT,
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/${imageFormat};base64,${base64Data}`,
-              },
+  const body = JSON.stringify({
+    model: "Qwen2.5-VL-7B",
+    messages: [
+      {
+        role: "system",
+        content: SYSTEM_PROMPT,
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/${imageFormat};base64,${base64Data}`,
             },
-            {
-              type: "text",
-              text: "请识别这张优惠券图片，返回 JSON 格式结果。",
-            },
-          ],
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.5,
-    }),
+          },
+          {
+            type: "text",
+            text: "请识别这张优惠券图片，返回 JSON 格式结果。",
+          },
+        ],
+      },
+    ],
+    max_tokens: 2000,
+    temperature: 0.5,
   });
+
+  const response = await fetchWithCorsProxy(
+    `${baseURL}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json;charset=UTF-8",
+        Authorization: `Bearer ${config.qwenApiKey}`,
+      },
+      body,
+    },
+    config.useCorsProxy
+  );
 
   if (!response.ok) {
     const error = await response.text();
@@ -195,39 +263,45 @@ async function callXunfei(
   if (!match) throw new Error("无效的图片数据");
   const [, imageFormat, base64Data] = match;
 
-  const response = await fetch(`${baseURL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json;charset=UTF-8",
-      Authorization: `Bearer ${config.xunfeiApiKey}`,
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages: [
-        {
-          role: "system",
-          content: SYSTEM_PROMPT,
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/${imageFormat};base64,${base64Data}`,
-              },
+  const body = JSON.stringify({
+    model: modelId,
+    messages: [
+      {
+        role: "system",
+        content: SYSTEM_PROMPT,
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/${imageFormat};base64,${base64Data}`,
             },
-            {
-              type: "text",
-              text: "请识别这张优惠券图片，返回 JSON 格式结果。",
-            },
-          ],
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.5,
-    }),
+          },
+          {
+            type: "text",
+            text: "请识别这张优惠券图片，返回 JSON 格式结果。",
+          },
+        ],
+      },
+    ],
+    max_tokens: 2000,
+    temperature: 0.5,
   });
+
+  const response = await fetchWithCorsProxy(
+    `${baseURL}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json;charset=UTF-8",
+        Authorization: `Bearer ${config.xunfeiApiKey}`,
+      },
+      body,
+    },
+    config.useCorsProxy
+  );
 
   if (!response.ok) {
     const error = await response.text();

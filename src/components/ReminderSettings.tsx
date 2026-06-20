@@ -84,6 +84,12 @@ function AISettings() {
     saveAIVisionConfig(next);
   };
 
+  const handleCorsProxyChange = (enabled: boolean) => {
+    const next = { ...aiConfig, useCorsProxy: enabled };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
   return (
     <div className="space-y-4">
       {/* 服务商选择 */}
@@ -189,16 +195,37 @@ function AISettings() {
         </div>
       )}
 
+      {/* CORS 代理开关 */}
+      <div className="flex items-center justify-between py-3 border-t border-b border-accent-grayLight/50">
+        <div>
+          <div className="text-sm font-medium text-accent-ink">
+            启用 CORS 代理（解决"Failed to fetch"）
+          </div>
+          <div className="text-xs text-accent-inkMute mt-1">
+            浏览器直连第三方 API 常被跨域限制拦截。开启后会先尝试直连，失败时自动通过公共代理转发。
+          </div>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={aiConfig.useCorsProxy}
+            onChange={(e) => handleCorsProxyChange(e.target.checked)}
+          />
+          <div className="w-11 h-6 bg-accent-grayLight rounded-full peer peer-checked:bg-purple-500 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 transition-all duration-200"></div>
+          <div className="absolute left-[2px] top-[2px] bg-white w-5 h-5 rounded-full border border-accent-grayLight transition-all duration-200 peer-checked:translate-x-5 shadow-sm"></div>
+        </label>
+      </div>
+
       <div className="p-3 bg-purple-50 rounded-xl">
         <h4 className="font-medium text-purple-600 mb-2 flex items-center gap-2 text-sm">
           <Lightbulb className="w-4 h-4" />
-          AI 识别优势
+          使用提示
         </h4>
         <ul className="text-xs text-purple-600/80 space-y-1">
-          <li>• 一步完成识别+解析，无需复杂规则</li>
-          <li>• 自动区分券标题和使用规则</li>
-          <li>• 支持各种格式，准确率最高</li>
-          <li>• 国内访问速度快，延迟低</li>
+          <li>• 如果上传图片后提示"Failed to fetch"，请确保已开启 CORS 代理</li>
+          <li>• 如果代理也不可用，可能是代理服务暂时繁忙，稍后再试</li>
+          <li>• 生产环境长期使用建议自建代理服务</li>
         </ul>
       </div>
     </div>
