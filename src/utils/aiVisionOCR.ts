@@ -322,17 +322,29 @@ function extractXunfeiContent(data: any): string {
 }
 
 /**
- * 调用讯飞星火（支持多种模型类型：图像理解 / OCR / 通用多模态）
+ * 调用讯飞星火
  *
- * 由于 MaaS 平台上不同模型（xqwen2d5s32bvl 图像理解 vs xoppaddleocrv16 OCR）
- * 可能使用不同的 API 路径和请求体格式，本函数会自动尝试多种常见组合。
+ * 鉴权策略（基于用户实际反馈调整）：
+ *   1. 若 API Key 包含 api_secret（格式 api_key:api_secret）→ 先尝试 HMAC-SHA256 签名鉴权
+ *   2. 否则尝试 Bearer Token 鉴权
+ *   3. 同时尝试多种请求体格式（chat/completions、completions 等）
  *
- * 尝试顺序：
- *   1. {baseURL}/chat/completions + messages[text+image]  （图像理解模型标准格式）
- *   2. {baseURL}/chat/completions + messages[image only]   （OCR 模型可能不需要 text prompt）
- *   3. {baseURL}/completions + prompt/inputs                （兼容 completions 风格）
- *   4. baseURL 本身（如果用户已配置完整路径）
+ * 讯飞 MaaS 平台上不同模型使用的鉴权方式不同：
+ *   - 部分模型使用 Bearer Token（OpenAI 兼容）
+ *   - 部分模型（如 xoppaddleocrv16）要求 HMAC-SHA256 签名
  */
+
+interface XunfeiBody {
+  model: string;
+  [key: string]: any;
+}
+
+interface XunfeiAttempt {
+  url: string;
+  body: XunfeiBody;
+  description: string;
+}
+
 async function callXunfei(
   imageDataUrl: string,
   config: AIVisionConfig
@@ -348,19 +360,19 @@ async function callXunfei(
     throw new Error("请先在设置中填写讯飞 Model ID（从服务管控页面获取）");
   }
 
-  // API Key：冒号分隔时取前半部分（兼容 api_key:api_secret 输入方式）
+  // 解析 API Key：支持 api_key:api_secret 格式
   const colonIdx = rawKey.indexOf(":");
-  const apiKey = colonIdx > 0 ? rawKey.substring(0, colonIdx).trim() : rawKey;
+  const hasSecret = colonIdx > 0 && colonIdx < rawKey.length - 1;
+  const apiKey = hasSecret ? rawKey.substring(0, colonIdx).trim() : rawKey;
+  const apiSecret = hasSecret ? rawKey.substring(colonIdx + 1).trim() : "";
 
   const match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!match) throw new Error("无效的图片数据");
   const [, imageFormat, base64Data] = match;
 
-  // 处理 baseURL：如果用户已经写了完整的带路径 URL（如 .../v2/chat/completions），
-  // 就不再自动追加路径；否则按 "基础路径 + /chat/completions" 处理
+  // URL 归一化：用户如果已经带了具体路径就不追加
   const normalizeURL = (base: string, defaultPath: string): string => {
     const trimmed = base.replace(/\/+$/, "");
-    // 如果 baseURL 已经包含具体路径（含 /chat 或 /completions 或 /ocr 等）
     if (
       trimmed.includes("/chat/") ||
       trimmed.endsWith("/chat/completions") ||
@@ -377,15 +389,10 @@ async function callXunfei(
   const fullPrompt = `${SYSTEM_PROMPT}\n\n请识别这张优惠券图片，返回 JSON 格式结果。`;
   const imageUrl = `data:image/${imageFormat};base64,${base64Data}`;
 
-  // 构造多种候选请求方案，按顺序尝试
-  const attempts: Array<{
-    url: string;
-    body: Record<string, unknown>;
-    description: string;
-  }> = [
+  // 构造多种请求体格式
+  const bodies: Omit<XunfeiAttempt, "url">[] = [
     {
-      description: "chat/completions + messages[text+image_url]",
-      url: normalizeURL(baseURL, "/chat/completions"),
+      description: "chat/completions messages[text+image]",
       body: {
         model: modelId,
         messages: [
@@ -403,8 +410,7 @@ async function callXunfei(
       },
     },
     {
-      description: "chat/completions + messages[image_url only]",
-      url: normalizeURL(baseURL, "/chat/completions"),
+      description: "chat/completions messages[image only]",
       body: {
         model: modelId,
         messages: [
@@ -418,8 +424,7 @@ async function callXunfei(
       },
     },
     {
-      description: "completions + prompt(image base64)",
-      url: normalizeURL(baseURL, "/completions"),
+      description: "completions prompt(image)",
       body: {
         model: modelId,
         prompt: imageUrl,
@@ -430,73 +435,167 @@ async function callXunfei(
     },
   ];
 
+  // 可选的 API 路径（由宽到窄尝试）
+  const paths = ["/chat/completions", "/completions"];
+
   // 调试日志
   const maskedKey =
     apiKey.length > 8
       ? apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length - 4)
       : "***";
+  const maskedSecret = apiSecret
+    ? apiSecret.length > 8
+      ? apiSecret.substring(0, 4) + "..." + apiSecret.substring(apiSecret.length - 4)
+      : "***"
+    : "(未提供)";
+
+  console.log(`[Xunfei] ========== 请求开始 ==========`);
   console.log(`[Xunfei] Model ID: ${modelId}`);
   console.log(`[Xunfei] API Key: ${maskedKey} (长度: ${apiKey.length})`);
+  console.log(`[Xunfei] API Secret: ${maskedSecret} (长度: ${apiSecret.length})`);
   console.log(`[Xunfei] Base URL: ${baseURL}`);
-  console.log(`[Xunfei] 即将尝试 ${attempts.length} 种请求方案...`);
+  console.log(
+    `[Xunfei] 鉴权方式: ${hasSecret ? "优先 HMAC-SHA256 签名，失败再试 Bearer Token" : "Bearer Token"}`
+  );
 
-  // 逐个方案尝试，遇到 404 / 422 / schema error 这类"路径或格式不支持"
-  // 的错误时自动切换到下一个方案；401 则立即停止（鉴权问题不是格式问题）
-  const nonRetryStatuses = new Set([401, 403]);
-  const lastErrors: Array<{ status: number; text: string; url: string }> = [];
+  const lastErrors: Array<{ status: number; text: string; url: string; auth: string }> = [];
 
-  for (let i = 0; i < attempts.length; i++) {
-    const attempt = attempts[i];
-    console.log(
-      `[Xunfei] 方案 ${i + 1}/${attempts.length}: POST ${attempt.url} (${attempt.description})`
-    );
+  // ========== 阶段 1：HMAC-SHA256 签名鉴权（如果有 api_secret）==========
+  if (hasSecret) {
+    console.log(`[Xunfei] ===== 阶段 1：HMAC 签名鉴权 =====`);
 
-    const response = await fetchWithCorsProxy(
-      attempt.url,
-      {
-        method: "POST",
-        headers: {
+    for (const path of paths) {
+      for (const { body, description } of bodies) {
+        const url = normalizeURL(baseURL, path);
+        const authInfo = `HMAC(headers="host date request-line")`;
+        console.log(
+          `[Xunfei]   POST ${url} (${description})`
+        );
+
+        // 每次请求生成新的签名（date 必须实时）
+        const sig = await generateXunfeiSignature(apiKey, apiSecret, url);
+        const bodyStr = JSON.stringify(body);
+
+        const headers: Record<string, string> = {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(attempt.body),
-      },
-      config.useCorsProxy
-    );
+          host: sig.host,
+          date: sig.date,
+          Authorization: sig.authorization,
+        };
 
-    console.log(`[Xunfei]   → 状态: ${response.status} ${response.statusText}`);
+        const response = await fetchWithCorsProxy(
+          url,
+          { method: "POST", headers, body: bodyStr },
+          config.useCorsProxy
+        );
 
-    if (response.ok) {
-      const data = await response.json();
-      const content = extractXunfeiContent(data);
-      console.log(
-        `[Xunfei]   ✅ 成功！方案 ${i + 1} 可用，响应内容长度: ${content.length}`
-      );
-      if (content) {
-        return parseAIResponse(content);
+        console.log(`[Xunfei]   → 状态: ${response.status}`);
+
+        if (response.ok) {
+          const data = await response.json();
+          const content = extractXunfeiContent(data);
+          console.log(
+            `[Xunfei]   ✅ 成功！响应内容长度: ${content.length}`
+          );
+          if (content) {
+            return parseAIResponse(content);
+          }
+          console.warn(`[Xunfei]   响应内容为空，继续尝试...`);
+          lastErrors.push({
+            status: response.status,
+            text: "响应内容为空",
+            url,
+            auth: authInfo,
+          });
+          continue;
+        }
+
+        const errorText = await response.text();
+        console.error(`[Xunfei]   ❌ 失败: ${errorText}`);
+        lastErrors.push({ status: response.status, text: errorText, url, auth: authInfo });
+
+        // HMAC 401 / "HMAC secret key does not match" 是鉴权问题，继续试其他路径没用
+        // 但如果是 schema 错误（400/422/500），可能只是请求体格式不对，继续试
+        if (
+          response.status === 401 ||
+          errorText.toLowerCase().includes("hmac signature cannot be verified") ||
+          errorText.toLowerCase().includes("hmac secret key does not match") ||
+          errorText.toLowerCase().includes("apikey not found")
+        ) {
+          // 401：停止阶段 1 的所有尝试，直接进入阶段 2
+          console.log(`[Xunfei]   HMAC 鉴权被拒绝，切换到 Bearer Token 方式...`);
+          break;
+        }
+
+        // 标记跳出双重循环
+        if (lastErrors.length > 0) {
+          const last = lastErrors[lastErrors.length - 1];
+          if (last.status === 401 || last.text.toLowerCase().includes("hmac")) {
+            break;
+          }
+        }
       }
-      console.warn(`[Xunfei]   响应内容为空，继续尝试下一个方案...`);
-      lastErrors.push({
-        status: response.status,
-        text: "响应内容为空，可能模型没有返回文本",
-        url: attempt.url,
-      });
-      continue;
+
+      // 检查是否需要跳出路径循环
+      if (lastErrors.length > 0) {
+        const last = lastErrors[lastErrors.length - 1];
+        if (last.status === 401 || last.text.toLowerCase().includes("hmac")) {
+          break;
+        }
+      }
+    }
+  }
+
+  // ========== 阶段 2：Bearer Token 鉴权 ==========
+  console.log(`[Xunfei] ===== 阶段 2：Bearer Token 鉴权 =====`);
+
+  for (const path of paths) {
+    for (const { body, description } of bodies) {
+      const url = normalizeURL(baseURL, path);
+      console.log(`[Xunfei]   POST ${url} (${description})`);
+
+      const response = await fetchWithCorsProxy(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(body),
+        },
+        config.useCorsProxy
+      );
+
+      console.log(`[Xunfei]   → 状态: ${response.status}`);
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = extractXunfeiContent(data);
+        console.log(`[Xunfei]   ✅ 成功！响应内容长度: ${content.length}`);
+        if (content) {
+          return parseAIResponse(content);
+        }
+        lastErrors.push({
+          status: response.status,
+          text: "响应内容为空",
+          url,
+          auth: "Bearer",
+        });
+        continue;
+      }
+
+      const errorText = await response.text();
+      console.error(`[Xunfei]   ❌ 失败: ${errorText}`);
+      lastErrors.push({ status: response.status, text: errorText, url, auth: "Bearer" });
+
+      // 401 鉴权失败：再换格式也没用
+      if (response.status === 401) break;
     }
 
-    const errorText = await response.text();
-    console.error(`[Xunfei]   ❌ 失败: ${errorText}`);
-
-    lastErrors.push({ status: response.status, text: errorText, url: attempt.url });
-
-    // 401 / 403 是鉴权问题，换格式没用 —— 立即停止
-    if (nonRetryStatuses.has(response.status)) {
-      break;
-    }
-
-    // 其他错误（404 / 422 / 500 schema 不匹配等），继续尝试下一个方案
-    if (i < attempts.length - 1) {
-      console.log(`[Xunfei]   格式不支持，切换到下一个方案...`);
+    if (lastErrors.length > 0) {
+      const last = lastErrors[lastErrors.length - 1];
+      if (last.status === 401) break;
     }
   }
 
@@ -504,57 +603,81 @@ async function callXunfei(
   const last = lastErrors[lastErrors.length - 1];
   throw buildXunfeiError(last?.status || 0, last?.text || "未知错误", {
     apiKeyLength: apiKey.length,
+    apiSecretLength: apiSecret.length,
+    hasSecret,
     modelId,
     url: last?.url || baseURL,
-    attempts: lastErrors.map((e) => `${e.status}: ${e.url}`).join("; "),
+    lastAuth: last?.auth || "unknown",
+    attempts: lastErrors.map((e) => `[${e.auth}] ${e.status} ${e.url}`).join("\n    "),
   });
 }
 
 function buildXunfeiError(
   status: number,
   errorText: string,
-  info: { apiKeyLength: number; modelId: string; url: string; attempts?: string }
+  info: {
+    apiKeyLength: number;
+    apiSecretLength: number;
+    hasSecret: boolean;
+    modelId: string;
+    url: string;
+    lastAuth: string;
+    attempts?: string;
+  }
 ): Error {
   let hint = "";
 
   if (status === 401) {
-    hint =
-      "\n\n🔧 401 鉴权失败（参考官方文档）：\n" +
-      `   - API Key 长度: ${info.apiKeyLength} 字符\n` +
-      `   - 使用的 Model ID: ${info.modelId}\n` +
-      `   - 最后尝试的请求地址: ${info.url}\n` +
-      "   排查步骤:\n" +
-      "   1. 登录讯飞开放平台，进入「服务管控 > 模型服务列表」\n" +
-      "   2. 找到你开通的服务，复制对应服务的「APIKey」（简单字符串，不是 WebSocket 的三要素）\n" +
-      "   3. 复制同一服务的「Model ID」\n" +
-      "   4. 确认账号额度充足\n" +
-      "   5. 如仍失败，请在讯飞控制台查看该服务的调用信息，确认 API 地址\n" +
-      "\n⚠️ 注意：图像理解 HTTP 协议使用 Bearer Token，不是 WebSocket 的 APPID/APISecret 三要素！\n" +
-      "\n原始错误信息：";
+    const lc = errorText.toLowerCase();
+    if (lc.includes("hmac secret key does not match")) {
+      hint =
+        "\n\n🔧 HMAC 签名秘钥不匹配：\n" +
+        `   - API Key 长度: ${info.apiKeyLength} 字符，API Secret 长度: ${info.apiSecretLength} 字符\n` +
+        `   - 使用的 Model ID: ${info.modelId}\n` +
+        `   - 请求地址: ${info.url}\n` +
+        `   - 最后使用的鉴权方式: ${info.lastAuth}\n` +
+        "   排查步骤:\n" +
+        "   1. 登录讯飞开放平台，进入「服务管控 > 模型服务列表」\n" +
+        "   2. 找到对应服务，复制「APIKey」（完整的 api_key:api_secret 格式，两个值都不能少）\n" +
+        "   3. 注意冒号前后都不能有空格或换行\n" +
+        "   4. 确认 Model ID 与 API Key 来自同一个服务\n" +
+        "   5. 确认账号额度充足\n" +
+        "\n💡 常见问题: 如果粘贴的 key/secret 长度明显偏短或偏长，\n" +
+        "       可能是复制时多复制或少复制了字符，请重新检查。\n" +
+        "\n原始错误信息：";
+    } else if (lc.includes("hmac signature cannot be verified")) {
+      hint =
+        "\n\n🔧 HMAC 签名无法验证（apikey not found）：\n" +
+        "   请确认 API Key 的格式是 api_key:api_secret（冒号分隔，无空格）\n" +
+        "   并从讯飞服务管控页面复制完整准确的字符串。\n" +
+        "\n原始错误信息：";
+    } else {
+      hint =
+        "\n\n🔧 401 鉴权失败：\n" +
+        `   - API Key 长度: ${info.apiKeyLength} 字符\n` +
+        `   - Model ID: ${info.modelId}\n` +
+        `   - 请求地址: ${info.url}\n` +
+        "   请在讯飞服务管控页面确认 API Key、Model ID 和 API 地址是否正确。\n" +
+        "\n原始错误信息：";
+    }
   } else if (status === 403) {
     hint =
-      "\n\n🔧 403 错误：\n" +
-      "   - API Key 与 Model ID 不匹配（Key 只对对应服务有权限）\n" +
-      "   - 或地区/IP 访问受限\n" +
-      "   请确认 Model ID 与 API Key 来自同一个服务\n" +
-      "\n原始错误信息：";
+      "\n\n🔧 403 错误：API Key 与 Model ID 不匹配，或地区/IP 受限\n请确认两者来自同一个服务。\n原始错误：";
   } else if (status === 404) {
-    hint =
-      "\n\n🔧 404 错误：API 路径不支持该模型\n" +
-      "   请在讯飞服务管控页面查看该服务的具体 API 地址\n" +
-      "\n原始错误信息：";
+    hint = "\n\n🔧 404 错误：API 路径不支持该模型\n原始错误：";
   } else if (status === 500 || status === 503) {
     hint =
       "\n\n⚠️ 服务端错误：账号额度不足 / 模型不可用 / 参数格式不匹配\n请在讯飞控制台确认额度与服务状态\n原始错误：";
   } else if (status === 400 || status === 422) {
-    hint =
-      "\n\n⚠️ 参数格式错误：模型不支持此请求结构，请在讯飞控制台查看该服务的文档\n原始错误：";
+    hint = "\n\n⚠️ 参数格式错误：请求体格式不被该模型支持\n原始错误：";
   } else if (status === 429) {
-    hint = "\n\n⚠️ 请求过快或额度不足：请稍后重试或检查账号额度\n原始错误：";
+    hint = "\n\n⚠️ 请求过快或额度不足：请稍后重试\n原始错误：";
+  } else {
+    hint = "\n\n请求失败：\n";
   }
 
   if (info.attempts) {
-    hint += `\n（已尝试的方案: ${info.attempts}）`;
+    hint += `\n已尝试的方案:\n    ${info.attempts}`;
   }
 
   return new Error(`讯飞星火 API 错误: ${status || "网络"}${hint}${errorText}`);
