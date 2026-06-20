@@ -91,6 +91,45 @@ const CORS_PROXIES = [
 ];
 
 /**
+ * 讯飞 HMAC-SHA256 签名生成
+ * API Key 格式：<api_key>:<api_secret>
+ */
+async function generateXunfeiSignature(
+  apiKey: string,
+  apiSecret: string,
+  fullUrl: string
+): Promise<{ authorization: string; date: string; host: string }> {
+  const url = new URL(fullUrl);
+  const host = url.host;
+  const date = new Date().toUTCString();
+  const requestLine = `POST ${url.pathname} HTTP/1.1`;
+
+  // 签名原文：host: xxx\ndate: xxx\nPOST /path HTTP/1.1
+  const signatureOrigin = `host: ${host}\ndate: ${date}\n${requestLine}`;
+
+  // 使用 Web Crypto API 做 HMAC-SHA256
+  const keyData = new TextEncoder().encode(apiSecret);
+  const msgData = new TextEncoder().encode(signatureOrigin);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
+  const signature = btoa(
+    String.fromCharCode(...new Uint8Array(signatureBuffer))
+  );
+
+  const authorization = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+
+  return { authorization, date, host };
+}
+
+/**
  * 使用 CORS 代理执行 fetch 请求
  * 先尝试直连，失败再依次尝试代理
  */
@@ -251,6 +290,7 @@ function parseAIResponse(content: string): AIVisionResult {
 /**
  * 调用讯飞星火图像理解
  * API: https://maas-api.cn-huabei-1.xf-yun.com/v2/chat/completions
+ * 鉴权方式：HMAC-SHA256 签名（api_key:api_secret 格式）
  */
 async function callXunfei(
   imageDataUrl: string,
@@ -259,9 +299,24 @@ async function callXunfei(
   const baseURL = config.xunfeiBaseURL || "https://maas-api.cn-huabei-1.xf-yun.com/v2";
   const modelId = config.xunfeiModelId || "imagev3";
 
+  // 解析 API Key：格式为 "api_key:api_secret"
+  const apiKeyParts = config.xunfeiApiKey.split(":");
+  if (apiKeyParts.length < 2) {
+    throw new Error(
+      "讯飞 API Key 格式错误，请完整复制（格式：api_key:api_secret）"
+    );
+  }
+  const apiKey = apiKeyParts[0];
+  const apiSecret = apiKeyParts.slice(1).join(":");
+
   const match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!match) throw new Error("无效的图片数据");
   const [, imageFormat, base64Data] = match;
+
+  const fullUrl = `${baseURL}/chat/completions`;
+
+  // 生成签名
+  const sig = await generateXunfeiSignature(apiKey, apiSecret, fullUrl);
 
   const body = JSON.stringify({
     model: modelId,
@@ -291,12 +346,14 @@ async function callXunfei(
   });
 
   const response = await fetchWithCorsProxy(
-    `${baseURL}/chat/completions`,
+    fullUrl,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json;charset=UTF-8",
-        Authorization: `Bearer ${config.xunfeiApiKey}`,
+        Authorization: sig.authorization,
+        Date: sig.date,
+        Host: sig.host,
       },
       body,
     },
@@ -305,7 +362,12 @@ async function callXunfei(
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`讯飞星火 API 错误: ${response.status} - ${error}`);
+    let hint = "";
+    if (response.status === 401) {
+      hint =
+        "\n\n排查建议：\n1. 请确认 API Key 完整复制（包含冒号后的 api_secret）\n2. 请确认 Model ID 正确（从讯飞服务管控页面获取）\n3. 请确认账号额度充足";
+    }
+    throw new Error(`讯飞星火 API 错误: ${response.status} - ${error}${hint}`);
   }
 
   const data = await response.json();

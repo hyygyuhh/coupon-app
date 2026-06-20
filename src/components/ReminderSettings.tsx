@@ -156,40 +156,48 @@ function AISettings() {
       {/* 讯飞星火配置 */}
       {aiConfig.provider === "xunfei" && (
         <div className="space-y-3">
+          <div className="p-3 bg-purple-50 rounded-xl text-xs text-purple-600/80">
+            <div className="font-medium mb-1">📌 重要提示</div>
+            <ul className="space-y-1 list-disc pl-4">
+              <li>API Key 格式：<code className="bg-white/50 px-1 rounded">api_key:api_secret</code>（完整复制，包括冒号）</li>
+              <li>Model ID：从服务管控页面获取（如 imagev3 等）</li>
+              <li>接口需要 HMAC-SHA256 签名，代码已自动处理</li>
+            </ul>
+          </div>
           <div>
             <label className="block text-sm font-medium text-accent-ink mb-2">
-              讯飞 API Key
+              讯飞 API Key（格式：api_key:api_secret）
             </label>
             <input
               type="password"
               value={aiConfig.xunfeiApiKey}
               onChange={(e) => handleXunfeiApiKeyChange(e.target.value)}
-              placeholder="输入讯飞 API Key"
-              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+              placeholder="例如：7f8b0cace0775914b1764065e03d11e6:ZGFiODA4NT..."
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition font-mono"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-accent-ink mb-2">
-              模型 ID <span className="text-accent-inkMute font-normal">(从服务管控页面获取)</span>
+              模型 ID（从服务管控页面获取）
             </label>
             <input
               type="text"
               value={aiConfig.xunfeiModelId || ""}
               onChange={(e) => handleXunfeiModelIdChange(e.target.value)}
-              placeholder="如：imagev3"
-              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+              placeholder="例如：imagev3"
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition font-mono"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-accent-ink mb-2">
-              API 地址 <span className="text-accent-inkMute font-normal">(可选)</span>
+              API 地址 <span className="text-accent-inkMute font-normal">(可选，默认即可）</span>
             </label>
             <input
               type="text"
               value={aiConfig.xunfeiBaseURL || ""}
               onChange={(e) => handleXunfeiBaseURLChange(e.target.value)}
-              placeholder="https://maas-api.cn-huabei-1.xf-yun.com/v1"
-              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+              placeholder="https://maas-api.cn-huabei-1.xf-yun.com/v2"
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition font-mono"
             />
           </div>
         </div>
