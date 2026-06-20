@@ -128,20 +128,20 @@ export async function recognizeImage(
     return cached;
   }
 
-  const { recognizeWithQwen, hasQwenConfig } = await import("./aiVisionOCR");
+  const { recognizeWithAI, hasAIConfig } = await import("./aiVisionOCR");
 
-  if (!hasQwenConfig()) {
-    throw new Error("请先在设置中配置 Qwen API Key");
+  if (!hasAIConfig()) {
+    throw new Error("请先在设置中配置 AI API Key");
   }
 
   try {
-    const result = await recognizeWithQwen(file, onProgress);
+    const result = await recognizeWithAI(file, onProgress);
 
     const ocrResult: OCRResult = {
       text: result.rawText || "",
       confidence: result.confidence,
       rounds: result.coupons.map((c, i) => ({
-        mode: `Qwen AI-${i + 1}`,
+        mode: `AI-${i + 1}`,
         text: `${c.name} ${c.amount || ""} ${c.expiryDate || ""}`.trim(),
         confidence: result.confidence,
         width: 0,
@@ -152,7 +152,7 @@ export async function recognizeImage(
     setCachedResult(file, ocrResult);
     return ocrResult;
   } catch (error: any) {
-    console.error("[OCR] Qwen AI 识别失败:", error);
+    console.error("[OCR] AI 识别失败:", error);
     throw error;
   }
 }

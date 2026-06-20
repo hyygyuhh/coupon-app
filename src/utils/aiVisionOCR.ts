@@ -1,15 +1,22 @@
 /**
- * AI 视觉识别服务 - Qwen
+ * AI 视觉识别服务
  * 
- * 使用 Qwen2.5-VL-7B 模型识别优惠券图片，
- * 一步完成 OCR 识别 + 结构化解析，准确率最高。
+ * 支持多种 AI 模型识别优惠券图片：
+ * - Qwen2.5-VL-7B
+ * - 讯飞星火图像理解
  */
 
 import type { CouponInput } from "../types/coupon";
 
+export type AIProvider = "qwen" | "xunfei";
+
 export interface AIVisionConfig {
+  provider: AIProvider;
   qwenApiKey: string;
   qwenBaseURL: string;
+  xunfeiApiKey: string;
+  xunfeiModelId: string;
+  xunfeiBaseURL: string;
 }
 
 const CONFIG_KEY = "ai-vision-config";
@@ -20,16 +27,24 @@ export function getAIVisionConfig(): AIVisionConfig {
     try {
       const parsed = JSON.parse(stored);
       return {
-        qwenApiKey: parsed.qwenApiKey || parsed.kimiApiKey || parsed.apiKey || "",
-        qwenBaseURL: parsed.qwenBaseURL || parsed.kimiBaseURL || parsed.baseURL || "https://agentrs.jd.com/api/saas/openai-u/v1",
+        provider: parsed.provider || "qwen",
+        qwenApiKey: parsed.qwenApiKey || parsed.apiKey || "",
+        qwenBaseURL: parsed.qwenBaseURL || parsed.baseURL || "https://agentrs.jd.com/api/saas/openai-u/v1",
+        xunfeiApiKey: parsed.xunfeiApiKey || "",
+        xunfeiModelId: parsed.xunfeiModelId || "",
+        xunfeiBaseURL: parsed.xunfeiBaseURL || "https://maas-api.cn-huabei-1.xf-yun.com/v2",
       };
     } catch {
       // ignore
     }
   }
   return {
+    provider: "qwen",
     qwenApiKey: "",
     qwenBaseURL: "https://agentrs.jd.com/api/saas/openai-u/v1",
+    xunfeiApiKey: "",
+    xunfeiModelId: "",
+    xunfeiBaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/v2",
   };
 }
 
@@ -166,16 +181,77 @@ function parseAIResponse(content: string): AIVisionResult {
 }
 
 /**
- * 使用 Qwen AI 识别优惠券
+ * 调用讯飞星火图像理解
+ * API: https://maas-api.cn-huabei-1.xf-yun.com/v2/chat/completions
  */
-export async function recognizeWithQwen(
+async function callXunfei(
+  imageDataUrl: string,
+  config: AIVisionConfig
+): Promise<AIVisionResult> {
+  const baseURL = config.xunfeiBaseURL || "https://maas-api.cn-huabei-1.xf-yun.com/v2";
+  const modelId = config.xunfeiModelId || "imagev3";
+
+  const match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!match) throw new Error("无效的图片数据");
+  const [, imageFormat, base64Data] = match;
+
+  const response = await fetch(`${baseURL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json;charset=UTF-8",
+      Authorization: `Bearer ${config.xunfeiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelId,
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/${imageFormat};base64,${base64Data}`,
+              },
+            },
+            {
+              type: "text",
+              text: "请识别这张优惠券图片，返回 JSON 格式结果。",
+            },
+          ],
+        },
+      ],
+      max_tokens: 2000,
+      temperature: 0.5,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`讯飞星火 API 错误: ${response.status} - ${error}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+
+  return parseAIResponse(content);
+}
+
+/**
+ * 使用 AI 识别优惠券（根据配置选择服务商）
+ */
+export async function recognizeWithAI(
   file: File,
   onProgress?: (progress: number, status: string) => void
 ): Promise<AIVisionResult> {
   const config = getAIVisionConfig();
 
-  if (!config.qwenApiKey) {
-    throw new Error("请先在设置中配置 Qwen API Key");
+  const hasKey = config.provider === "qwen" ? config.qwenApiKey : config.xunfeiApiKey;
+  if (!hasKey) {
+    throw new Error(`请先在设置中配置 ${config.provider === "qwen" ? "Qwen" : "讯飞星火"} API Key`);
   }
 
   onProgress?.(0.1, "正在准备图片");
@@ -187,23 +263,30 @@ export async function recognizeWithQwen(
     reader.readAsDataURL(file);
   });
 
-  onProgress?.(0.3, "正在调用 Qwen AI 识别");
+  const providerName = config.provider === "qwen" ? "Qwen" : "讯飞星火";
+  onProgress?.(0.3, `正在调用 ${providerName} AI 识别`);
 
   try {
-    const result = await callQwen(imageDataUrl, config);
+    const result = config.provider === "qwen"
+      ? await callQwen(imageDataUrl, config)
+      : await callXunfei(imageDataUrl, config);
     onProgress?.(1, "识别完成");
     return result;
   } catch (error: any) {
-    console.error("[Qwen AI] 识别失败:", error);
+    console.error(`[${providerName} AI] 识别失败:`, error);
     onProgress?.(0, `识别失败: ${error.message}`);
     throw error;
   }
 }
 
 /**
- * 判断是否配置了 Qwen API Key
+ * 判断是否配置了 API Key
  */
-export function hasQwenConfig(): boolean {
+export function hasAIConfig(): boolean {
   const config = getAIVisionConfig();
-  return !!config.qwenApiKey;
+  return config.provider === "qwen" ? !!config.qwenApiKey : !!config.xunfeiApiKey;
 }
+
+// 兼容旧函数名
+export const recognizeWithQwen = recognizeWithAI;
+export const hasQwenConfig = hasAIConfig;

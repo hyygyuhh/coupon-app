@@ -22,6 +22,7 @@ import {
 import { useCouponStore } from "../store/couponStore";
 import { exportAndDownload, importFromFile, type ImportResult } from "../utils/export";
 import { getAIVisionConfig, saveAIVisionConfig } from "../utils/aiVisionOCR";
+import type { AIProvider } from "../utils/aiVisionOCR";
 
 function DingTalkIcon({ className = "w-10 h-10" }: { className?: string }) {
   return (
@@ -43,54 +44,155 @@ function FeishuIcon({ className = "w-10 h-10" }: { className?: string }) {
   );
 }
 
-// Qwen AI 设置组件
-function QwenAISettings() {
+// AI 设置组件
+function AISettings() {
   const [aiConfig, setAiConfig] = useState(() => getAIVisionConfig());
 
-  const handleApiKeyChange = (key: string) => {
+  const handleProviderChange = (provider: AIProvider) => {
+    const next = { ...aiConfig, provider };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
+  const handleQwenApiKeyChange = (key: string) => {
     const next = { ...aiConfig, qwenApiKey: key };
     setAiConfig(next);
     saveAIVisionConfig(next);
   };
 
-  const handleBaseURLChange = (url: string) => {
+  const handleQwenBaseURLChange = (url: string) => {
     const next = { ...aiConfig, qwenBaseURL: url };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
+  const handleXunfeiApiKeyChange = (key: string) => {
+    const next = { ...aiConfig, xunfeiApiKey: key };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
+  const handleXunfeiModelIdChange = (modelId: string) => {
+    const next = { ...aiConfig, xunfeiModelId: modelId };
+    setAiConfig(next);
+    saveAIVisionConfig(next);
+  };
+
+  const handleXunfeiBaseURLChange = (url: string) => {
+    const next = { ...aiConfig, xunfeiBaseURL: url };
     setAiConfig(next);
     saveAIVisionConfig(next);
   };
 
   return (
     <div className="space-y-4">
+      {/* 服务商选择 */}
       <div>
         <label className="block text-sm font-medium text-accent-ink mb-2">
-          Qwen API Key
+          AI 服务商
         </label>
-        <input
-          type="password"
-          value={aiConfig.qwenApiKey}
-          onChange={(e) => handleApiKeyChange(e.target.value)}
-          placeholder="输入 Qwen API Key"
-          className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => handleProviderChange("qwen")}
+            className={`p-3 rounded-xl border-2 transition-all ${
+              aiConfig.provider === "qwen"
+                ? "border-purple-500 bg-purple-50"
+                : "border-accent-grayLight hover:border-purple-300"
+            }`}
+          >
+            <div className="font-medium text-accent-ink">Qwen</div>
+            <div className="text-xs text-accent-inkMute">通义千问 VL</div>
+          </button>
+          <button
+            onClick={() => handleProviderChange("xunfei")}
+            className={`p-3 rounded-xl border-2 transition-all ${
+              aiConfig.provider === "xunfei"
+                ? "border-purple-500 bg-purple-50"
+                : "border-accent-grayLight hover:border-purple-300"
+            }`}
+          >
+            <div className="font-medium text-accent-ink">讯飞星火</div>
+            <div className="text-xs text-accent-inkMute">图像理解</div>
+          </button>
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-accent-ink mb-2">
-          API 地址 <span className="text-accent-inkMute font-normal">(可选)</span>
-        </label>
-        <input
-          type="text"
-          value={aiConfig.qwenBaseURL || ""}
-          onChange={(e) => handleBaseURLChange(e.target.value)}
-          placeholder="https://agentrs.jd.com/api/saas/openai-u/v1"
-          className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
-        />
-      </div>
+      {/* Qwen 配置 */}
+      {aiConfig.provider === "qwen" && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              Qwen API Key
+            </label>
+            <input
+              type="password"
+              value={aiConfig.qwenApiKey}
+              onChange={(e) => handleQwenApiKeyChange(e.target.value)}
+              placeholder="输入 Qwen API Key"
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              API 地址 <span className="text-accent-inkMute font-normal">(可选)</span>
+            </label>
+            <input
+              type="text"
+              value={aiConfig.qwenBaseURL || ""}
+              onChange={(e) => handleQwenBaseURLChange(e.target.value)}
+              placeholder="https://agentrs.jd.com/api/saas/openai-u/v1"
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 讯飞星火配置 */}
+      {aiConfig.provider === "xunfei" && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              讯飞 API Key
+            </label>
+            <input
+              type="password"
+              value={aiConfig.xunfeiApiKey}
+              onChange={(e) => handleXunfeiApiKeyChange(e.target.value)}
+              placeholder="输入讯飞 API Key"
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              模型 ID <span className="text-accent-inkMute font-normal">(从服务管控页面获取)</span>
+            </label>
+            <input
+              type="text"
+              value={aiConfig.xunfeiModelId || ""}
+              onChange={(e) => handleXunfeiModelIdChange(e.target.value)}
+              placeholder="如：imagev3"
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-accent-ink mb-2">
+              API 地址 <span className="text-accent-inkMute font-normal">(可选)</span>
+            </label>
+            <input
+              type="text"
+              value={aiConfig.xunfeiBaseURL || ""}
+              onChange={(e) => handleXunfeiBaseURLChange(e.target.value)}
+              placeholder="https://maas-api.cn-huabei-1.xf-yun.com/v2"
+              className="w-full px-4 py-3 bg-paper border border-accent-grayLight rounded-2xl text-accent-ink text-sm placeholder:text-accent-inkMute/60 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="p-3 bg-purple-50 rounded-xl">
         <h4 className="font-medium text-purple-600 mb-2 flex items-center gap-2 text-sm">
           <Lightbulb className="w-4 h-4" />
-          Qwen AI 识别优势
+          AI 识别优势
         </h4>
         <ul className="text-xs text-purple-600/80 space-y-1">
           <li>• 一步完成识别+解析，无需复杂规则</li>
@@ -860,15 +962,15 @@ export default function ReminderSettings() {
         </div>
       </div>
 
-      {/* OCR 识别设置 */}
+      {/* AI 识别设置 */}
       <div className="bg-white rounded-3xl p-5 shadow-card border border-accent-grayLight/50 mt-4">
         <h3 className="font-bold text-accent-ink mb-4 flex items-center gap-2">
           <Bot className="w-5 h-5 text-accent-orange" />
-          Qwen AI 识别
+          AI 图像识别
         </h3>
-        <p className="text-sm text-accent-inkMute mb-4">使用 Qwen2.5-VL-7B 模型进行优惠券识别，准确率最高</p>
+        <p className="text-sm text-accent-inkMute mb-4">支持 Qwen、讯飞星火等多种 AI 模型识别优惠券</p>
 
-        <QwenAISettings />
+        <AISettings />
       </div>
 
       {/* 数据备份与导入 */}
