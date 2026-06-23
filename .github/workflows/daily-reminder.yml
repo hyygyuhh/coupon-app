@@ -2,8 +2,8 @@ name: Daily Coupon Reminder
 
 on:
   schedule:
-    # 每小时执行一次，脚本内部会根据配置决定是否发送提醒
-    - cron: '0 * * * *'
+    # 每天北京时间 09:00 执行（即 UTC 01:00）
+    - cron: '0 1 * * *'
   workflow_dispatch:
     # 支持手动触发
 
@@ -32,11 +32,7 @@ jobs:
           REMINDER_TYPE: ${{ secrets.REMINDER_TYPE }}
         run: |
           echo "🚀 启动优惠券提醒检查..."
-          echo "📅 当前时间: $(date -u)"
+          echo "📅 当前时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "📅 本地时间: $(date '+%Y-%m-%d %H:%M:%S %Z')"
           node scripts/check-reminders.cjs
           echo "✅ 脚本执行完成"
-
-      - name: Handle failure
-        if: failure()
-        run: |
-          echo "❌ 提醒检查失败，请查看上方日志"
